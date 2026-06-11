@@ -325,7 +325,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v1.9</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v2.0</p>
 </header>
 
 <div class="topbar">
@@ -574,6 +574,11 @@ async function dbRead() {
 }
 
 async function dbWrite(data) {
+  // GUARD: nunca escribir chat vacío si ya había mensajes
+  if((!data.chat || data.chat.length === 0) && db.chat && db.chat.length > 0) {
+    console.warn('⚠️ dbWrite bloqueado: intentó borrar chat con', db.chat.length, 'mensajes');
+    data.chat = db.chat; // restaurar chat actual
+  }
   const res = await fetch('/api/db', {
     method:'POST',
     headers:{'Content-Type':'application/json'},
