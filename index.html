@@ -325,7 +325,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v2.8</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v2.9</p>
 </header>
 
 <div class="topbar">
@@ -583,13 +583,12 @@ async function dbWrite(data) {
 async function cargarDatos() {
   setSyncStatus('loading');
   try {
-    const fresh = await dbRead();
-    // Preservar chat local si el servidor devuelve vacío
-    const chatAnterior = db.chat || [];
+    const [fresh, chatRes] = await Promise.all([
+      dbRead(),
+      fetch('/api/chat').then(r=>r.json()).catch(()=>({chat:[]}))
+    ]);
     db = fresh;
-    if((!db.chat || db.chat.length === 0) && chatAnterior.length > 0) {
-      db.chat = chatAnterior;
-    }
+    db.chat = chatRes.chat || [];
     // Actualizar partidos si hace >1h o si hay partido en vivo (cada 2 min)
     await actualizarPartidosSiNecesario();
     // Asignar retos a partidos que los necesiten
@@ -669,11 +668,14 @@ function iniciarTimers() {
     } else {
       // Actualizar online sin recargar partidos
       try {
-        const fresh = await dbRead();
+        const [fresh, chatRes] = await Promise.all([
+          dbRead(),
+          fetch('/api/chat').then(r=>r.json()).catch(()=>({chat:db.chat||[]}))
+        ]);
         db.presencia = fresh.presencia||[];
         db.predicciones = fresh.predicciones||[];
         db.retos = fresh.retos||[];
-        db.chat = fresh.chat||[];
+        db.chat = chatRes.chat||db.chat||[];
         db.participantes = fresh.participantes||db.participantes;
         db.premios = fresh.premios||db.premios;
         renderOnline();
