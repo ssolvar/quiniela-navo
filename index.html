@@ -355,8 +355,8 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
     <div class="chat-title">💬 Chat del grupo</div>
     <div class="chat-msgs" id="chat-msgs"><div class="chat-empty">Sé el primero en comentar...</div></div>
     <div class="chat-input-wrap" id="chat-input-wrap">
-      <input class="chat-input" id="chat-input" placeholder="Escribe algo... 🔥⚽🎯" maxlength="200">
-      <button class="chat-send" id="chat-send">➤</button>
+      <input class="chat-input" id="chat-input" placeholder="Escribe algo... 🔥⚽🎯" maxlength="200" onkeydown="if(event.key==='Enter')enviarMensaje()">
+      <button class="chat-send" id="chat-send" onclick="enviarMensaje()">➤</button>
     </div>
     <div id="chat-login-msg" style="display:none;font-size:12px;color:#6677aa;text-align:center;padding:8px">Ingresa con tu PIN para comentar</div>
   </div>
