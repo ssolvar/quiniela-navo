@@ -325,7 +325,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v3.3</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v3.4</p>
 </header>
 
 <div class="topbar">
@@ -830,15 +830,14 @@ async function responderReto(partidoId, opcion) {
 // RENDER — RETO PRINCIPAL
 // =============================================
 function getPartidosConReto() {
-  // Partidos en vivo con reto + próximos con reto, ordenados por relevancia
-  const ahora = Date.now();
+  const _ahora = Date.now();
   const vivos = db.partidos.filter(p=>(p.status==='LIVE'||p.status==='HT') && getRetoPartido(p.id));
   const proximos = db.partidos.filter(p=>{
     if(p.status!=='PRE') return false;
     const reto = getRetoPartido(p.id);
     if(!reto) return false;
     const inicio = new Date(p.fecha+'T'+(p.hora||'00:00')+':00Z');
-    return (inicio - ahora) <= 2*60*60*1000; // solo 2h antes
+    return (inicio - _ahora) <= 2*60*60*1000;
   }).sort((a,b)=>new Date(a.fecha+'T'+(a.hora||'00:00')+':00Z')-new Date(b.fecha+'T'+(b.hora||'00:00')+':00Z'));
   const terminados = db.partidos.filter(p=>p.status==='FT' && getRetoPartido(p.id));
   return [...vivos, ...proximos, ...terminados];
