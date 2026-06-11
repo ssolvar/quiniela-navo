@@ -325,7 +325,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v2.0</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v2.1</p>
 </header>
 
 <div class="topbar">
@@ -574,11 +574,6 @@ async function dbRead() {
 }
 
 async function dbWrite(data) {
-  // GUARD: nunca escribir chat vacío si ya había mensajes
-  if((!data.chat || data.chat.length === 0) && db.chat && db.chat.length > 0) {
-    console.warn('⚠️ dbWrite bloqueado: intentó borrar chat con', db.chat.length, 'mensajes');
-    data.chat = db.chat; // restaurar chat actual
-  }
   const res = await fetch('/api/db', {
     method:'POST',
     headers:{'Content-Type':'application/json'},
@@ -607,51 +602,13 @@ async function cargarDatos() {
 
 async function guardarCampos(campos) {
   try {
-    const actual = await dbRead();
-    const nuevo = { ...actual };
-
-    // Para arrays críticos: hacer merge en vez de sobreescribir
-    // Participantes, predicciones, premios — tomar el más largo (el que tiene más datos)
-    ['participantes','predicciones','premios'].forEach(k => {
-      if(campos[k] !== undefined) {
-        // Si el actual tiene más datos, no sobreescribir (previene borrado por race condition)
-        if(!actual[k] || campos[k].length >= actual[k].length) {
-          nuevo[k] = campos[k];
-        } else {
-          nuevo[k] = actual[k]; // mantener el que tiene más datos
-        }
-      }
+    // Con KV cada campo se guarda independientemente — sin race conditions
+    await fetch('/api/db', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(campos)
     });
-
-    // Para retos: merge por partidoId, no sobreescribir
-    if(campos.retos !== undefined) {
-      const retosActuales = actual.retos || [];
-      const retosNuevos = campos.retos || [];
-      const mergedRetos = [...retosActuales];
-      retosNuevos.forEach(r => {
-        const idx = mergedRetos.findIndex(x=>x.partidoId===r.partidoId);
-        if(idx>=0) mergedRetos[idx] = r; // actualizar existente
-        else mergedRetos.push(r); // agregar nuevo
-      });
-      nuevo.retos = mergedRetos;
-    }
-
-    // Para chat: merge por id, mantener todos los mensajes
-    if(campos.chat !== undefined) {
-      const chatActual = actual.chat || [];
-      const chatNuevo = campos.chat || [];
-      const allIds = new Set(chatActual.map(m=>m.id));
-      chatNuevo.forEach(m => { if(!allIds.has(m.id)) chatActual.push(m); });
-      nuevo.chat = chatActual.slice(-10);
-    }
-
-    // Para presencia y partidos: sobreescribir directo
-    ['presencia','partidos','partidosFetchedAt'].forEach(k => {
-      if(campos[k] !== undefined) nuevo[k] = campos[k];
-    });
-
-    await dbWrite(nuevo);
-    db = { ...db, ...nuevo };
+    db = { ...db, ...campos };
   } catch(e) { console.error('Error guardando:', e); toast('❌ Error guardando'); }
 }
 
