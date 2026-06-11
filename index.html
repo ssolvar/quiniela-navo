@@ -325,7 +325,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v2.3</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v2.4</p>
 </header>
 
 <div class="topbar">
@@ -675,9 +675,13 @@ function iniciarTimers() {
         db.presencia = fresh.presencia||[];
         db.predicciones = fresh.predicciones||[];
         db.retos = fresh.retos||[];
+        db.chat = fresh.chat||[];
+        db.participantes = fresh.participantes||db.participantes;
+        db.premios = fresh.premios||db.premios;
         renderOnline();
         renderRetoPrincipal();
         renderTabla();
+        renderChat();
       } catch(e) {}
     }
   }, 30*1000);
