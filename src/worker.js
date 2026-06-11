@@ -103,13 +103,39 @@ export default {
     // ==========================================
     if (path === '/api/partidos') {
       try {
-        // Intentar football-data.org primero
-        const res = await fetch(`${FOOTBALL_BASE}/competitions/WC/matches?season=2026`, {
-          headers: { 'X-Auth-Token': FOOTBALL_KEY }
-        });
+        // Usar worldcup26.ir — gratis, sin key, datos en vivo
+        const res = await fetch('https://worldcup26.ir/get/games');
         const data = await res.json();
-        if(data.matches && data.matches.length > 0) {
-          const partidos = data.matches.map(normPartido);
+        const games = data.games || data;
+        if(games && games.length > 0) {
+          const partidos = games.map(g => {
+            const finished = g.finished === 'TRUE' || g.finished === true;
+            const live = g.time_elapsed === 'live' || (g.time_elapsed && g.time_elapsed !== 'notstarted' && !finished);
+            let status = 'PRE';
+            if(finished) status = 'FT';
+            else if(live) status = 'LIVE';
+            // Parse fecha/hora
+            const dateStr = g.local_date || '';
+            const [datePart, timePart] = dateStr.split(' ');
+            const [month, day, year] = (datePart||'').split('/');
+            const fecha = year && month && day ? `${year}-${month.padStart(2,'0')}-${day.padStart(2,'0')}` : '';
+            return {
+              id: String(g.id),
+              local: g.home_team_name_en || 'TBD',
+              visitante: g.away_team_name_en || 'TBD',
+              localCod: '',
+              visitanteCod: '',
+              fecha,
+              hora: timePart || '',
+              fase: g.type === 'group' ? 'Fase de Grupos' : 'Eliminatorias',
+              grupo: g.group ? 'Grupo ' + g.group : '',
+              estadio: '',
+              status,
+              g1: g.home_score !== null && g.home_score !== undefined ? parseInt(g.home_score) : null,
+              g2: g.away_score !== null && g.away_score !== undefined ? parseInt(g.away_score) : null,
+              minuto: g.time_elapsed && g.time_elapsed !== 'live' && g.time_elapsed !== 'notstarted' ? g.time_elapsed : null,
+            };
+          });
           const partidosFetchedAt = new Date().toISOString();
           await Promise.all([
             kvSet(KV, 'partidos', partidos),
@@ -117,21 +143,6 @@ export default {
           ]);
           return new Response(JSON.stringify({ partidos, partidosFetchedAt }), { headers: CORS });
         }
-        // Si falla, intentar API alternativa
-        const res2 = await fetch('https://api.football-data.org/v4/competitions/WC/matches', {
-          headers: { 'X-Auth-Token': FOOTBALL_KEY }
-        });
-        const data2 = await res2.json();
-        if(data2.matches && data2.matches.length > 0) {
-          const partidos = data2.matches.map(normPartido);
-          const partidosFetchedAt = new Date().toISOString();
-          await Promise.all([
-            kvSet(KV, 'partidos', partidos),
-            kvSet(KV, 'partidosFetchedAt', partidosFetchedAt),
-          ]);
-          return new Response(JSON.stringify({ partidos, partidosFetchedAt }), { headers: CORS });
-        }
-        // Usar KV cache
         const partidos = await kvGet(KV, 'partidos') || [];
         return new Response(JSON.stringify({ partidos, fromCache: true }), { headers: CORS });
       } catch(e) {
