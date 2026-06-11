@@ -325,7 +325,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v2.4</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v2.6</p>
 </header>
 
 <div class="topbar">
@@ -586,7 +586,13 @@ async function dbWrite(data) {
 async function cargarDatos() {
   setSyncStatus('loading');
   try {
-    db = await dbRead();
+    const fresh = await dbRead();
+    // Preservar chat local si el servidor devuelve vacío
+    const chatAnterior = db.chat || [];
+    db = fresh;
+    if((!db.chat || db.chat.length === 0) && chatAnterior.length > 0) {
+      db.chat = chatAnterior;
+    }
     // Actualizar partidos si hace >1h o si hay partido en vivo (cada 2 min)
     await actualizarPartidosSiNecesario();
     // Asignar retos a partidos que los necesiten
@@ -1943,18 +1949,16 @@ async function enviarMensaje() {
   };
 
   inp.value = '';
-  // Leer DB fresco para no perder mensajes de otros
   try {
-    const fresco = await dbRead();
-    const chatActual = fresco.chat || [];
-    // Verificar que el mensaje no se duplicó
-    if(!chatActual.find(m=>m.id===msg.id)) {
-      const chatNuevo = [...chatActual, msg].slice(-10);
-      fresco.chat = chatNuevo;
-      await dbWrite(fresco);
-      db = { ...db, chat: chatNuevo };
-      renderChat();
-    }
+    // Usar endpoint dedicado solo para chat
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ accion: 'agregar', mensaje: msg })
+    });
+    const data = await res.json();
+    db.chat = data.chat || db.chat;
+    renderChat();
   } catch(e) {
     console.error('Error enviando mensaje:', e);
     toast('❌ Error al enviar');
@@ -1964,10 +1968,13 @@ async function enviarMensaje() {
 async function borrarMensaje(id) {
   if(currentRole!=='admin') return;
   try {
-    const fresco = await dbRead();
-    fresco.chat = (fresco.chat||[]).filter(m=>m.id!==id);
-    await dbWrite(fresco);
-    db.chat = fresco.chat;
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ accion: 'borrar', id })
+    });
+    const data = await res.json();
+    db.chat = data.chat || db.chat;
     renderChat();
     toast('Mensaje eliminado');
   } catch(e) { toast('❌ Error al borrar'); }
