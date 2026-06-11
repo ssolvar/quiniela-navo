@@ -150,7 +150,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 .stat-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
 .stat-bar-wrap{flex:1;background:var(--grb);border-radius:20px;height:8px;overflow:hidden}
 .stat-bar{height:100%;border-radius:20px;background:var(--v);transition:width .6s}
-.stat-nom{min-width:90px;font-weight:500;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stat-nom{min-width:90px;font-weight:500;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#dde4ff}
 .stat-pts{min-width:30px;text-align:right;font-weight:700;color:var(--dos);font-size:12px}
 
 /* LIDER */
@@ -251,9 +251,9 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 /* COBERTURA */
 /* COBERTURA */
 .cob-table{width:100%;border-collapse:collapse;font-size:11px}
-.cob-table th{padding:4px 5px;color:#666;font-weight:600;border-bottom:1px solid var(--grb);text-align:center;min-width:44px}
+.cob-table th{padding:4px 5px;color:#aabbdd;font-weight:600;border-bottom:1px solid #1a2a70;text-align:center;min-width:44px}
 .cob-table th:first-child{text-align:left;min-width:80px}
-.cob-table td{padding:5px;border-bottom:1px solid var(--grb);text-align:center}
+.cob-table td{padding:5px;border-bottom:1px solid #1a2a70;text-align:center;color:#ffffff}
 .cob-table td:first-child{text-align:left}
 
 @media(max-width:480px){
@@ -1076,7 +1076,7 @@ function renderCobertura() {
     let faltantes=0;
     const celdas=proximos.map(partido=>{
       const pred=db.predicciones.find(pr=>pr.pid===part.id&&pr.mid===partido.id);
-      if(pred)return`<td><span style="color:var(--v);font-weight:700">${pred.g1}-${pred.g2}</span></td>`;
+      if(pred)return`<td><span style="color:#ffffff;font-weight:700">${pred.g1}-${pred.g2}</span></td>`;
       faltantes++;return`<td><span style="color:var(--rj)">✗</span></td>`;
     }).join('');
     const color=faltantes===0?'#27ae60':faltantes<=2?'#f39c12':'#e74c3c';
