@@ -1535,11 +1535,11 @@ async function cargarMundial() {
 
 async function fetchNoticias() {
   try {
-    const res = await fetch(NEWS_URL);
+    const res = await fetch('/functions/noticias');
     if(!res.ok) throw new Error(res.status);
     const data = await res.json();
-    mundialCache.noticias = data.articles || [];
-  } catch(e) { console.error('News API:', e.message); mundialCache.noticias = []; }
+    mundialCache.noticias = (data.articles || []).filter(a=>a.title&&a.title!=='[Removed]');
+  } catch(e) { console.error('Noticias:', e.message); mundialCache.noticias = []; }
 }
 
 async function fetchStandings() {
