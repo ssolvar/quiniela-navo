@@ -558,10 +558,8 @@ function aplicarRol() {
 // JSONBIN — DB
 // =============================================
 async function dbRead() {
-  const res = await fetch(JSONBIN_URL+'/latest', {
-    headers:{'X-Master-Key':JSONBIN_KEY,'X-Bin-Meta':'false'}
-  });
-  if(!res.ok) throw new Error('JSONBin read: '+res.status);
+  const res = await fetch('/api/db');
+  if(!res.ok) throw new Error('DB read: '+res.status);
   const data = await res.json();
   return {
     participantes: data.participantes||[],
@@ -576,12 +574,12 @@ async function dbRead() {
 }
 
 async function dbWrite(data) {
-  const res = await fetch(JSONBIN_URL, {
-    method:'PUT',
-    headers:{'Content-Type':'application/json','X-Master-Key':JSONBIN_KEY},
+  const res = await fetch('/api/db', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
     body:JSON.stringify(data)
   });
-  if(!res.ok) throw new Error('JSONBin write: '+res.status);
+  if(!res.ok) throw new Error('DB write: '+res.status);
 }
 
 async function cargarDatos() {
@@ -1985,6 +1983,7 @@ function renderAll(){
     await cargarDatos();
     iniciarTimers();
     registrarPresencia();
+    iniciarChatTimer();
   }
 })();
 </script>
