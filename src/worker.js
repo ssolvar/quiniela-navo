@@ -86,7 +86,7 @@ export default {
     if (path === '/api/noticias') {
       try {
         // Google News RSS - noticias del Mundial en español de todos los países
-        const rssUrl = 'https://news.google.com/rss/search?q=Copa+del+Mundo+2026+FIFA&hl=es-419&gl=US&ceid=US:es-419';
+        const rssUrl = 'https://news.google.com/rss/search?q=Mundial+2026+OR+FIFA+2026+OR+Copa+del+Mundo&hl=es-419&gl=US&ceid=US:es-419&when:1d';
         const res = await fetch(rssUrl, {
           headers: { 'User-Agent': 'Mozilla/5.0 (compatible; QuinielaNavo/1.0)' }
         });
