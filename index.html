@@ -603,9 +603,50 @@ async function cargarDatos() {
 async function guardarCampos(campos) {
   try {
     const actual = await dbRead();
-    const nuevo = { ...actual, ...campos };
+    const nuevo = { ...actual };
+
+    // Para arrays críticos: hacer merge en vez de sobreescribir
+    // Participantes, predicciones, premios — tomar el más largo (el que tiene más datos)
+    ['participantes','predicciones','premios'].forEach(k => {
+      if(campos[k] !== undefined) {
+        // Si el actual tiene más datos, no sobreescribir (previene borrado por race condition)
+        if(!actual[k] || campos[k].length >= actual[k].length) {
+          nuevo[k] = campos[k];
+        } else {
+          nuevo[k] = actual[k]; // mantener el que tiene más datos
+        }
+      }
+    });
+
+    // Para retos: merge por partidoId, no sobreescribir
+    if(campos.retos !== undefined) {
+      const retosActuales = actual.retos || [];
+      const retosNuevos = campos.retos || [];
+      const mergedRetos = [...retosActuales];
+      retosNuevos.forEach(r => {
+        const idx = mergedRetos.findIndex(x=>x.partidoId===r.partidoId);
+        if(idx>=0) mergedRetos[idx] = r; // actualizar existente
+        else mergedRetos.push(r); // agregar nuevo
+      });
+      nuevo.retos = mergedRetos;
+    }
+
+    // Para chat: merge por id, mantener todos los mensajes
+    if(campos.chat !== undefined) {
+      const chatActual = actual.chat || [];
+      const chatNuevo = campos.chat || [];
+      const allIds = new Set(chatActual.map(m=>m.id));
+      chatNuevo.forEach(m => { if(!allIds.has(m.id)) chatActual.push(m); });
+      nuevo.chat = chatActual.slice(-10);
+    }
+
+    // Para presencia y partidos: sobreescribir directo
+    ['presencia','partidos','partidosFetchedAt'].forEach(k => {
+      if(campos[k] !== undefined) nuevo[k] = campos[k];
+    });
+
     await dbWrite(nuevo);
-    db = { ...db, ...campos };
+    db = { ...db, ...nuevo };
   } catch(e) { console.error('Error guardando:', e); toast('❌ Error guardando'); }
 }
 
