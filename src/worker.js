@@ -203,21 +203,52 @@ export default {
     // ---- CHAT: endpoint dedicado ----
     if (path === '/api/chat') {
       if (request.method === 'GET') {
-        const chat = await kvGet(KV, 'chat_mensajes') || [];
-        return new Response(JSON.stringify({ chat }), { headers: CORS });
+        // Combinar mensajes de ambas keys y migrar a chat_mensajes
+        const [chatViejo, chatNuevo] = await Promise.all([
+          kvGet(KV, 'chat'),
+          kvGet(KV, 'chat_mensajes')
+        ]);
+        const todos = [...(chatViejo||[]), ...(chatNuevo||[])];
+        // Deduplicar por id
+        const vistos = new Set();
+        const unicos = todos.filter(m => {
+          if(vistos.has(m.id)) return false;
+          vistos.add(m.id); return true;
+        });
+        // Ordenar por fecha
+        unicos.sort((a,b) => new Date(a.ts) - new Date(b.ts));
+        const final = unicos.slice(-20);
+        // Migrar todo a chat_mensajes y limpiar chat viejo
+        if(chatViejo && chatViejo.length > 0) {
+          await Promise.all([
+            kvSet(KV, 'chat_mensajes', final),
+            kvSet(KV, 'chat', [])
+          ]);
+        }
+        return new Response(JSON.stringify({ chat: final }), { headers: CORS });
       }
       if (request.method === 'POST') {
         const body = await request.json();
         let chat = await kvGet(KV, 'chat_mensajes') || [];
+        // También incluir mensajes viejos si los hay
+        const chatViejo = await kvGet(KV, 'chat') || [];
+        if(chatViejo.length > 0) {
+          const todos = [...chatViejo, ...chat];
+          const vistos = new Set();
+          chat = todos.filter(m => {
+            if(vistos.has(m.id)) return false;
+            vistos.add(m.id); return true;
+          }).sort((a,b) => new Date(a.ts) - new Date(b.ts)).slice(-20);
+          await kvSet(KV, 'chat', []);
+        }
         if(body.accion === 'agregar' && body.mensaje) {
           if(!chat.find(m=>m.id===body.mensaje.id)) {
             chat = [...chat, body.mensaje].slice(-20);
-            await kvSet(KV, 'chat_mensajes', chat);
           }
         } else if(body.accion === 'borrar' && body.id) {
           chat = chat.filter(m=>m.id!==body.id);
-          await kvSet(KV, 'chat_mensajes', chat);
         }
+        await kvSet(KV, 'chat_mensajes', chat);
         return new Response(JSON.stringify({ chat }), { headers: CORS });
       }
     }
