@@ -122,38 +122,13 @@ export default {
       try {
         const body = await request.json();
         const writes = [];
-
-        // PROTECCIÓN TOTAL: nunca sobreescribir con arrays más pequeños
-        const protectedFields = ['participantes','predicciones','premios','retos','presencia','chat'];
-        for(const field of protectedFields) {
+        const kvFields = ['participantes','predicciones','premios','retos','presencia'];
+        for(const field of kvFields) {
           if(body[field] !== undefined) {
-            const actual = await kvGet(KV, field);
-            const incoming = body[field];
-            // Para chat: nunca borrar mensajes existentes
-            if(field === 'chat') {
-              if(!actual || actual.length === 0) {
-                // KV vacío — escribir lo que venga
-                if(incoming.length > 0) writes.push(kvSet(KV, field, incoming));
-              } else if(incoming.length > 0) {
-                // Merge: combinar mensajes del KV con los nuevos
-                const existingIds = new Set(actual.map(m=>m.id));
-                const merged = [...actual];
-                incoming.forEach(m => { if(!existingIds.has(m.id)) merged.push(m); });
-                // Si hay borrados intencionales (menos mensajes), respetar solo si viene del admin
-                const isDelete = incoming.length < actual.length;
-                writes.push(kvSet(KV, field, isDelete ? incoming : merged.slice(-20)));
-              }
-              // Si viene vacío y KV tiene mensajes: NO escribir nada
-            } else {
-              // Para otros campos: escribir si viene con datos o si KV está vacío
-              if(!actual || actual.length === 0 || incoming.length >= actual.length) {
-                writes.push(kvSet(KV, field, incoming));
-              } else if(incoming.length > 0) {
-                writes.push(kvSet(KV, field, incoming));
-              }
-            }
+            writes.push(kvSet(KV, field, body[field]));
           }
         }
+        // Chat NO se toca aquí — usa /api/chat
         // Partidos van a JSONBin si vienen
         if(body.partidos !== undefined || body.partidosFetchedAt !== undefined) {
           writes.push((async () => {
