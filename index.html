@@ -325,7 +325,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v3.1</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v3.3</p>
 </header>
 
 <div class="topbar">
@@ -475,6 +475,7 @@ let pinBuffer = '';
 let liveTimer = null;
 let presenciaTimer = null;
 let grupoActivo = 'Fase de Grupos';
+let retoIndex = 0; // índice del reto activo en pantalla principal
 let premiosTemp = [];
 
 // =============================================
@@ -801,6 +802,12 @@ function getRetoPartido(partidoId) {
   return db.retos.find(r=>r.partidoId===partidoId)||null;
 }
 
+function navegarReto(dir) {
+  const partidos = getPartidosConReto();
+  retoIndex = (retoIndex + dir + partidos.length) % partidos.length;
+  renderRetoPrincipal();
+}
+
 async function responderReto(partidoId, opcion) {
   if(!currentUserId) { toast('Inicia sesión con tu PIN personal para responder'); return; }
   const reto = getRetoPartido(partidoId);
@@ -822,23 +829,33 @@ async function responderReto(partidoId, opcion) {
 // =============================================
 // RENDER — RETO PRINCIPAL
 // =============================================
+function getPartidosConReto() {
+  // Partidos en vivo con reto + próximos con reto, ordenados por relevancia
+  const ahora = Date.now();
+  const vivos = db.partidos.filter(p=>(p.status==='LIVE'||p.status==='HT') && getRetoPartido(p.id));
+  const proximos = db.partidos.filter(p=>{
+    if(p.status!=='PRE') return false;
+    const reto = getRetoPartido(p.id);
+    if(!reto) return false;
+    const inicio = new Date(p.fecha+'T'+(p.hora||'00:00')+':00Z');
+    return (inicio - ahora) <= 2*60*60*1000; // solo 2h antes
+  }).sort((a,b)=>new Date(a.fecha+'T'+(a.hora||'00:00')+':00Z')-new Date(b.fecha+'T'+(b.hora||'00:00')+':00Z'));
+  const terminados = db.partidos.filter(p=>p.status==='FT' && getRetoPartido(p.id));
+  return [...vivos, ...proximos, ...terminados];
+}
+
 function renderRetoPrincipal() {
   const c = document.getElementById('reto-principal');
   if(!c) return;
 
-  // Buscar el partido más relevante: en vivo primero, luego el próximo
-  const ahora = Date.now();
-  let partido = db.partidos.find(p=>p.status==='LIVE'||p.status==='HT');
-  if(!partido) {
-    // Próximo partido con reto asignado
-    const conReto = db.partidos.filter(p=>{
-      if(p.status!=='PRE') return false;
-      const reto = getRetoPartido(p.id);
-      return !!reto;
-    }).sort((a,b)=>new Date(a.fecha+'T'+(a.hora||'00:00')+':00Z')-new Date(b.fecha+'T'+(b.hora||'00:00')+':00Z'));
-    partido = conReto[0]||null;
-  }
+  const partidos = getPartidosConReto();
+  if(!partidos.length) { c.innerHTML=''; return; }
 
+  // Asegurar que retoIndex es válido
+  if(retoIndex >= partidos.length) retoIndex = 0;
+  if(retoIndex < 0) retoIndex = partidos.length - 1;
+
+  const partido = partidos[retoIndex];
   if(!partido) { c.innerHTML=''; return; }
 
   const reto = getRetoPartido(partido.id);
@@ -894,6 +911,11 @@ function renderRetoPrincipal() {
     ${resultadoHtml}
     ${countdownHtml}
     ${isPre&&!currentUserId?'<div class="reto-countdown" style="color:#f0b429">⚠️ Ingresa con tu PIN personal para responder</div>':''}
+    ${partidos.length > 1 ? `<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,.1)">
+      <button onclick="navegarReto(-1)" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px">◀ Anterior</button>
+      <span style="color:rgba(255,255,255,.5);font-size:12px">${retoIndex+1} / ${partidos.length} retos</span>
+      <button onclick="navegarReto(1)" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px">Siguiente ▶</button>
+    </div>` : ''}
   </div>`;
 }
 
@@ -1930,6 +1952,13 @@ function renderChat() {
   }).join('');
 }
 
+function chatGuardarLocal(msgs) {
+  try { localStorage.setItem('q_chat', JSON.stringify(msgs)); } catch(e) {}
+}
+function chatLeerLocal() {
+  try { return JSON.parse(localStorage.getItem('q_chat')||'[]'); } catch(e) { return []; }
+}
+
 async function enviarMensaje() {
   const inp = document.getElementById('chat-input');
   if(!inp) return;
@@ -1954,6 +1983,7 @@ async function enviarMensaje() {
     });
     const data = await res.json();
     db.chat = data.chat || db.chat;
+    chatGuardarLocal(db.chat);
     renderChat();
   } catch(e) {
     console.error('Error enviando mensaje:', e);
@@ -1971,6 +2001,7 @@ async function borrarMensaje(id) {
     });
     const data = await res.json();
     db.chat = data.chat || db.chat;
+    chatGuardarLocal(db.chat);
     renderChat();
     toast('Mensaje eliminado');
   } catch(e) { toast('❌ Error al borrar'); }
