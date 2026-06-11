@@ -325,7 +325,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v2.2</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v2.3</p>
 </header>
 
 <div class="topbar">
@@ -803,8 +803,12 @@ async function responderReto(partidoId, opcion) {
   if(partido&&(partido.status==='LIVE'||partido.status==='HT'||partido.status==='FT')) {
     toast('🔒 El partido ya inició'); return;
   }
+  // Bloquear si ya respondió
+  if(reto.respuestas && reto.respuestas[currentUserId]) {
+    toast('🔒 Ya respondiste este reto'); return;
+  }
   reto.respuestas[currentUserId] = opcion;
-  toast('✅ Reto guardado');
+  toast('✅ Reto guardado — no se puede cambiar');
   renderRetoPrincipal();
   await guardarCampos({retos:db.retos});
 }
