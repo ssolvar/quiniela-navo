@@ -1916,17 +1916,34 @@ async function enviarMensaje() {
   };
 
   inp.value = '';
-  db.chat = [...(db.chat||[]), msg].slice(-10); // solo últimos 10
-  renderChat();
-  await guardarCampos({ chat: db.chat });
+  // Leer DB fresco para no perder mensajes de otros
+  try {
+    const fresco = await dbRead();
+    const chatActual = fresco.chat || [];
+    // Verificar que el mensaje no se duplicó
+    if(!chatActual.find(m=>m.id===msg.id)) {
+      const chatNuevo = [...chatActual, msg].slice(-10);
+      fresco.chat = chatNuevo;
+      await dbWrite(fresco);
+      db = { ...db, chat: chatNuevo };
+      renderChat();
+    }
+  } catch(e) {
+    console.error('Error enviando mensaje:', e);
+    toast('❌ Error al enviar');
+  }
 }
 
 async function borrarMensaje(id) {
   if(currentRole!=='admin') return;
-  db.chat = (db.chat||[]).filter(m=>m.id!==id);
-  renderChat();
-  await guardarCampos({ chat: db.chat });
-  toast('Mensaje eliminado');
+  try {
+    const fresco = await dbRead();
+    fresco.chat = (fresco.chat||[]).filter(m=>m.id!==id);
+    await dbWrite(fresco);
+    db.chat = fresco.chat;
+    renderChat();
+    toast('Mensaje eliminado');
+  } catch(e) { toast('❌ Error al borrar'); }
 }
 
 function iniciarChatTimer() {
