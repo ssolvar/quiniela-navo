@@ -242,10 +242,10 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 .noticia-body h4{font-size:13px;font-weight:600;line-height:1.3;margin-bottom:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .noticia-body span{font-size:11px;color:#888}
 /* STATS */
-.stat-item{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--grb);font-size:13px}
+.stat-item{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #1a2a70;font-size:13px;flex-wrap:wrap;gap:4px}
 .stat-item:last-child{border-bottom:none}
-.stat-item-label{color:#555;flex:1}
-.stat-item-value{font-weight:700;color:var(--v);text-align:right}
+.stat-item-label{color:#dde4ff;flex:1;min-width:160px}
+.stat-item-value{font-weight:700;color:#4fc3f7;text-align:right}
 .stat-curiosidad{background:linear-gradient(135deg,#1a3a2a,#0f5c35);border-radius:10px;padding:10px 14px;color:#fff;font-size:13px;margin-bottom:8px;border-left:4px solid var(--do)}
 
 /* COBERTURA */
@@ -1666,20 +1666,53 @@ function renderStatsQuiniela() {
   const lider = ranking[0];
   const ultimo = ranking[ranking.length-1];
 
+  // Stats adicionales
+  const totalPartidos = db.partidos.length;
+  const predsPorPart = totalPreds > 0 ? Math.round(totalPreds / Math.max(db.participantes.length,1)) : 0;
+  
+  // Participante con más exactos
+  let masExactos = 0, masExactosNombre = '';
+  db.participantes.forEach(part => {
+    let ex = 0;
+    partTerminados.forEach(par => {
+      const pred = db.predicciones.find(pr=>pr.pid===part.id&&pr.mid===par.id);
+      if(pred&&pred.g1===par.g1&&pred.g2===par.g2) ex++;
+    });
+    if(ex > masExactos) { masExactos=ex; masExactosNombre=part.nombre; }
+  });
+
+  // Promedio de goles predichos
+  const totalGolesPredichos = db.predicciones.reduce((s,p)=>s+(p.g1||0)+(p.g2||0),0);
+  const promedioGoles = totalPreds > 0 ? (totalGolesPredichos/totalPreds).toFixed(1) : 0;
+
+  // Participante con más predicciones
+  let masPreds = 0, masPredsNombre = '';
+  db.participantes.forEach(part => {
+    const n = db.predicciones.filter(p=>p.pid===part.id).length;
+    if(n > masPreds) { masPreds=n; masPredsNombre=part.nombre; }
+  });
+
   const stats = [
-    lider ? { label:`🥇 Va ganando`, value:`${lider.nombre} con ${pts[lider.id]||0} pts` } : null,
-    rachaMax>0 ? { label:`🔥 Mejor racha`, value:`${rachaPersona} (${rachaMax} seguidos)` } : null,
-    predMasPopular ? { label:`🎯 Predicción más popular`, value:predMasPopular } : null,
-    mejorPartido ? { label:`✅ Partido más acertado`, value:mejorPartido } : null,
-    totalPreds>0 ? { label:`🤝 Predicen empate`, value:`${pctEmpate}% del grupo` } : null,
-    lider&&ultimo&&lider.id!==ultimo.id ? { label:`📊 Diferencia líder-último`, value:`${(pts[lider.id]||0)-(pts[ultimo.id]||0)} pts` } : null,
+    lider ? { label:'🥇 Va ganando', value:`${lider.nombre} · ${pts[lider.id]||0} pts` } : null,
+    ultimo&&lider&&lider.id!==ultimo.id ? { label:'🏳️ Va último', value:`${ultimo.nombre} · ${pts[ultimo.id]||0} pts` } : null,
+    rachaMax>0 ? { label:'🔥 Mejor racha actual', value:`${rachaPersona} · ${rachaMax} seguidos` } : null,
+    masExactos>0 ? { label:'🎯 Más marcadores exactos', value:`${masExactosNombre} · ${masExactos} exacto${masExactos!==1?'s':''}` } : null,
+    predMasPopular ? { label:'📊 Predicción más popular', value:predMasPopular } : null,
+    mejorPartido ? { label:'✅ Partido más acertado', value:mejorPartido } : null,
+    masPredsNombre ? { label:'📝 Más comprometido', value:`${masPredsNombre} · ${masPreds} predicciones` } : null,
+    totalPreds>0 ? { label:'🤝 Predicen empate', value:`${pctEmpate}% del grupo` } : null,
+    totalPreds>0 ? { label:'⚽ Promedio goles predichos', value:`${promedioGoles} goles/partido` } : null,
+    lider&&ultimo&&lider.id!==ultimo.id ? { label:'📏 Diferencia líder-último', value:`${(pts[lider.id]||0)-(pts[ultimo.id]||0)} pts` } : null,
   ].filter(Boolean);
 
   if(!stats.length) {
     c.innerHTML = '<div class="card"><div class="empty">Las stats aparecerán cuando terminen partidos</div></div>'; return;
   }
   c.innerHTML = '<div class="card">'
-    + stats.map(s=>`<div class="stat-item"><span class="stat-item-label">${s.label}</span><span class="stat-item-value">${s.value}</span></div>`).join('')
+    + stats.map((s,i)=>`<div class="stat-item">
+        <span class="stat-item-label" style="color:#dde4ff">${s.label}</span>
+        <span class="stat-item-value" style="color:#4fc3f7;font-weight:700">${s.value}</span>
+      </div>`).join('')
     + '</div>';
 }
 
