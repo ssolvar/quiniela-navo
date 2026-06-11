@@ -681,7 +681,12 @@ async function actualizarPartidosSiNecesario() {
     const data = await res.json();
     db.partidos = data.partidos || db.partidos;
     db.partidosFetchedAt = new Date().toISOString();
-    await dbWrite(db);
+    // Solo actualizar partidos — NO tocar chat, predicciones ni otros campos
+    const fresco = await dbRead();
+    fresco.partidos = db.partidos;
+    fresco.partidosFetchedAt = db.partidosFetchedAt;
+    await dbWrite(fresco);
+    db.chat = fresco.chat || db.chat; // actualizar chat local con el del servidor
   } catch(e) { console.error('Football API error:', e.message); }
 }
 
