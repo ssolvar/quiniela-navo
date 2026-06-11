@@ -248,7 +248,41 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 .stat-item-value{font-weight:700;color:#4fc3f7;text-align:right}
 .stat-curiosidad{background:linear-gradient(135deg,#1a3a2a,#0f5c35);border-radius:10px;padding:10px 14px;color:#fff;font-size:13px;margin-bottom:8px;border-left:4px solid var(--do)}
 
+/* CHAT */
+.chat-wrap{background:#0d1440;border-radius:14px;padding:14px 15px;margin-bottom:10px;box-shadow:0 4px 20px rgba(0,0,0,.4);border:1px solid #1a2a70}
+.chat-title{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;color:var(--do);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.chat-msgs{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;min-height:40px}
+.chat-msg{display:flex;align-items:flex-start;gap:8px}
+.chat-msg-body{background:#141e5c;border-radius:10px;padding:7px 10px;flex:1}
+.chat-msg-name{font-size:11px;font-weight:700;color:var(--do);margin-bottom:2px}
+.chat-msg-text{font-size:14px;color:#ffffff;word-break:break-word}
+.chat-msg-time{font-size:10px;color:#6677aa;margin-top:3px}
+.chat-msg.mine .chat-msg-body{background:#1a3a8a}
+.chat-input-wrap{display:flex;gap:8px;align-items:center}
+.chat-input{flex:1;background:#0a0e27;border:1.5px solid #1a2a70;border-radius:20px;padding:10px 14px;color:#fff;font-family:'Inter',sans-serif;font-size:14px;outline:none}
+.chat-input:focus{border-color:var(--do)}
+.chat-send{background:var(--do);border:none;border-radius:20px;padding:10px 16px;color:#0a0e27;font-weight:700;font-size:14px;cursor:pointer;font-family:'Inter',sans-serif;flex-shrink:0}
+.chat-empty{text-align:center;color:#6677aa;font-size:13px;padding:12px}
+.chat-msg-del{background:none;border:none;color:#c8102e;cursor:pointer;font-size:14px;padding:2px 4px;opacity:.6;flex-shrink:0}
+
 /* COBERTURA */
+/* CHAT */
+.chat-wrap{background:#0d1440;border-radius:14px;padding:14px 15px;margin-bottom:10px;box-shadow:0 4px 20px rgba(0,0,0,.4);border:1px solid #1a2a70}
+.chat-title{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;color:var(--do);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.chat-msgs{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;min-height:40px}
+.chat-msg{display:flex;align-items:flex-start;gap:8px}
+.chat-msg-body{background:#141e5c;border-radius:10px;padding:7px 10px;flex:1}
+.chat-msg-name{font-size:11px;font-weight:700;color:var(--do);margin-bottom:2px}
+.chat-msg-text{font-size:14px;color:#ffffff;word-break:break-word}
+.chat-msg-time{font-size:10px;color:#6677aa;margin-top:3px}
+.chat-msg.mine .chat-msg-body{background:#1a3a8a}
+.chat-input-wrap{display:flex;gap:8px;align-items:center}
+.chat-input{flex:1;background:#0a0e27;border:1.5px solid #1a2a70;border-radius:20px;padding:10px 14px;color:#fff;font-family:'Inter',sans-serif;font-size:14px;outline:none}
+.chat-input:focus{border-color:var(--do)}
+.chat-send{background:var(--do);border:none;border-radius:20px;padding:10px 16px;color:#0a0e27;font-weight:700;font-size:14px;cursor:pointer;font-family:'Inter',sans-serif;flex-shrink:0}
+.chat-empty{text-align:center;color:#6677aa;font-size:13px;padding:12px}
+.chat-msg-del{background:none;border:none;color:#c8102e;cursor:pointer;font-size:14px;padding:2px 4px;opacity:.6;flex-shrink:0}
+
 /* COBERTURA */
 .cob-table{width:100%;border-collapse:collapse;font-size:11px}
 .cob-table th{padding:4px 5px;color:#aabbdd;font-weight:600;border-bottom:1px solid #1a2a70;text-align:center;min-width:44px}
@@ -316,6 +350,16 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 <div id="tab-tabla" class="panel active">
   <!-- RETO ACTIVO -->
   <div id="reto-principal"></div>
+  <!-- CHAT -->
+  <div class="chat-wrap">
+    <div class="chat-title">💬 Chat del grupo</div>
+    <div class="chat-msgs" id="chat-msgs"><div class="chat-empty">Sé el primero en comentar...</div></div>
+    <div class="chat-input-wrap" id="chat-input-wrap">
+      <input class="chat-input" id="chat-input" placeholder="Escribe algo... 🔥⚽🎯" maxlength="200">
+      <button class="chat-send" id="chat-send">➤</button>
+    </div>
+    <div id="chat-login-msg" style="display:none;font-size:12px;color:#6677aa;text-align:center;padding:8px">Ingresa con tu PIN para comentar</div>
+  </div>
   <div id="lider-area"></div>
   <div class="card"><h2>🏆 Tabla de Posiciones</h2><div id="tabla-cont"></div></div>
   <div class="card"><h2>📊 Puntos</h2><div id="stats-cont"></div></div>
@@ -426,7 +470,7 @@ const RETOS_BANCO = [
 // =============================================
 // ESTADO
 // =============================================
-let db = { participantes:[], predicciones:[], premios:[], partidos:[], retos:[], presencia:[], partidosFetchedAt:null };
+let db = { participantes:[], predicciones:[], premios:[], partidos:[], retos:[], presencia:[], chat:[], partidosFetchedAt:null };
 let currentRole = null;
 let currentUserId = null;
 let pinBuffer = '';
@@ -476,6 +520,7 @@ function entrar() {
   renderAll();
   iniciarTimers();
   registrarPresencia();
+  iniciarChatTimer();
 }
 
 function cerrarSesion() {
@@ -525,6 +570,7 @@ async function dbRead() {
     partidos:      data.partidos||[],
     retos:         data.retos||[],
     presencia:     data.presencia||[],
+    chat:          data.chat||[],
     partidosFetchedAt: data.partidosFetchedAt||null,
   };
 }
@@ -1819,12 +1865,95 @@ function renderStandings() {
 }
 
 // =============================================
+// CHAT
+// =============================================
+let chatTimer = null;
+
+function renderChat() {
+  const msgs = document.getElementById('chat-msgs');
+  const inputWrap = document.getElementById('chat-input-wrap');
+  const loginMsg = document.getElementById('chat-login-msg');
+  if(!msgs) return;
+
+  const puedeComentар = currentRole==='admin' || !!currentUserId;
+  if(inputWrap) inputWrap.style.display = puedeComentар ? 'flex' : 'none';
+  if(loginMsg) loginMsg.style.display = puedeComentар ? 'none' : 'block';
+
+  const chat = db.chat||[];
+  if(!chat.length) {
+    msgs.innerHTML = '<div class="chat-empty">Sé el primero en comentar... 💬</div>';
+    return;
+  }
+
+  msgs.innerHTML = chat.slice(-10).reverse().map(m => {
+    const esMio = m.uid === currentUserId || (m.uid==='admin' && currentRole==='admin');
+    const part = db.participantes.find(p=>p.id===m.uid);
+    const nombre = m.uid==='admin' ? '⚡ Admin' : (part?part.nombre:'?');
+    const hora = m.ts ? new Date(m.ts).toLocaleTimeString('es-CR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Costa_Rica'}) : '';
+    const delBtn = currentRole==='admin' ? `<button class="chat-msg-del" onclick="borrarMensaje('${m.id}')">✕</button>` : '';
+    return `<div class="chat-msg ${esMio?'mine':''}">
+      ${avatarHtml(part||{nombre:nombre.charAt(0)})}
+      <div class="chat-msg-body">
+        <div class="chat-msg-name">${nombre}</div>
+        <div class="chat-msg-text">${m.texto}</div>
+        <div class="chat-msg-time">${hora}</div>
+      </div>
+      ${delBtn}
+    </div>`;
+  }).join('');
+}
+
+async function enviarMensaje() {
+  const inp = document.getElementById('chat-input');
+  if(!inp) return;
+  const texto = inp.value.trim();
+  if(!texto) return;
+  if(!currentUserId && currentRole!=='admin') { toast('Ingresa con tu PIN para comentar'); return; }
+
+  const msg = {
+    id: Date.now().toString(),
+    uid: currentRole==='admin' ? 'admin' : currentUserId,
+    texto: texto,
+    ts: new Date().toISOString(),
+  };
+
+  inp.value = '';
+  db.chat = [...(db.chat||[]), msg].slice(-10); // solo últimos 10
+  renderChat();
+  await guardarCampos({ chat: db.chat });
+}
+
+async function borrarMensaje(id) {
+  if(currentRole!=='admin') return;
+  db.chat = (db.chat||[]).filter(m=>m.id!==id);
+  renderChat();
+  await guardarCampos({ chat: db.chat });
+  toast('Mensaje eliminado');
+}
+
+function iniciarChatTimer() {
+  if(chatTimer) clearInterval(chatTimer);
+  chatTimer = setInterval(async () => {
+    try {
+      const fresh = await dbRead();
+      const chatAnterior = JSON.stringify(db.chat||[]);
+      const chatNuevo = JSON.stringify(fresh.chat||[]);
+      if(chatAnterior !== chatNuevo) {
+        db.chat = fresh.chat||[];
+        renderChat();
+      }
+    } catch(e) {}
+  }, 10*1000); // cada 10 segundos
+}
+
+// =============================================
 // RENDER ALL
 // =============================================
 function renderAll(){
   aplicarRol();
   renderOnline();
   renderRetoPrincipal();
+  renderChat();
   renderTabla();
   renderPartidos();
   renderBracket();
