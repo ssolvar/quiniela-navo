@@ -1,4 +1,4 @@
-const FOOTBALL_KEY  = '9ffbbd9890b24d43a0c2d5667a0bfbd9';
+const FOOTBALL_KEY  = '9629fc7059cd4418a697d0d21f2eb10b';
 const NEWS_KEY      = 'dd7695a891a046fabb270718eb220064';
 const FOOTBALL_BASE = 'https://api.football-data.org/v4';
 const HTML_URL      = 'https://raw.githubusercontent.com/ssolvar/quiniela-navo/main/index.html';
@@ -103,17 +103,37 @@ export default {
     // ==========================================
     if (path === '/api/partidos') {
       try {
+        // Intentar football-data.org primero
         const res = await fetch(`${FOOTBALL_BASE}/competitions/WC/matches?season=2026`, {
           headers: { 'X-Auth-Token': FOOTBALL_KEY }
         });
         const data = await res.json();
-        const partidos = (data.matches||[]).map(normPartido);
-        const partidosFetchedAt = new Date().toISOString();
-        await Promise.all([
-          kvSet(KV, 'partidos', partidos),
-          kvSet(KV, 'partidosFetchedAt', partidosFetchedAt),
-        ]);
-        return new Response(JSON.stringify({ partidos, partidosFetchedAt }), { headers: CORS });
+        if(data.matches && data.matches.length > 0) {
+          const partidos = data.matches.map(normPartido);
+          const partidosFetchedAt = new Date().toISOString();
+          await Promise.all([
+            kvSet(KV, 'partidos', partidos),
+            kvSet(KV, 'partidosFetchedAt', partidosFetchedAt),
+          ]);
+          return new Response(JSON.stringify({ partidos, partidosFetchedAt }), { headers: CORS });
+        }
+        // Si falla, intentar API alternativa
+        const res2 = await fetch('https://api.football-data.org/v4/competitions/WC/matches', {
+          headers: { 'X-Auth-Token': FOOTBALL_KEY }
+        });
+        const data2 = await res2.json();
+        if(data2.matches && data2.matches.length > 0) {
+          const partidos = data2.matches.map(normPartido);
+          const partidosFetchedAt = new Date().toISOString();
+          await Promise.all([
+            kvSet(KV, 'partidos', partidos),
+            kvSet(KV, 'partidosFetchedAt', partidosFetchedAt),
+          ]);
+          return new Response(JSON.stringify({ partidos, partidosFetchedAt }), { headers: CORS });
+        }
+        // Usar KV cache
+        const partidos = await kvGet(KV, 'partidos') || [];
+        return new Response(JSON.stringify({ partidos, fromCache: true }), { headers: CORS });
       } catch(e) {
         const partidos = await kvGet(KV, 'partidos') || [];
         return new Response(JSON.stringify({ partidos, error: e.message }), { headers: CORS });
