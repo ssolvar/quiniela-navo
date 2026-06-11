@@ -1,5 +1,7 @@
 const FOOTBALL_KEY  = '9ffbbd9890b24d43a0c2d5667a0bfbd9';
 const NEWS_KEY      = 'dd7695a891a046fabb270718eb220064';
+const JSONBIN_ID    = '6a28287ff5f4af5e29d268c7';
+const JSONBIN_KEY   = '$2a$10$RpBaOrEN5kbNEXni5oWSvOTJjNCel.lsGSo1s7cqZMYQQcDcLVLQm';
 const FOOTBALL_BASE = 'https://api.football-data.org/v4';
 const HTML_URL      = 'https://raw.githubusercontent.com/ssolvar/quiniela-navo/main/index.html';
 
@@ -119,6 +121,37 @@ export default {
         });
       } catch(e) {
         return new Response(JSON.stringify({ articles: [], error: e.message }), { headers: CORS });
+      }
+    }
+
+    // ---- PROXY: DB Read (GET /api/db) ----
+    if (path === '/api/db' && request.method === 'GET') {
+      try {
+        const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, {
+          headers: { 'X-Master-Key': JSONBIN_KEY, 'X-Bin-Meta': 'false' }
+        });
+        const data = await res.json();
+        return new Response(JSON.stringify(data), {
+          headers: { ...CORS, 'Content-Type': 'application/json' }
+        });
+      } catch(e) {
+        return new Response(JSON.stringify({ error: e.message }), { headers: CORS, status: 500 });
+      }
+    }
+
+    // ---- PROXY: DB Write (POST /api/db) ----
+    if (path === '/api/db' && request.method === 'POST') {
+      try {
+        const body = await request.json();
+        const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_KEY },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        return new Response(JSON.stringify({ ok: true }), { headers: CORS });
+      } catch(e) {
+        return new Response(JSON.stringify({ error: e.message }), { headers: CORS, status: 500 });
       }
     }
 
