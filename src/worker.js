@@ -86,7 +86,7 @@ export default {
     if (path === '/api/noticias') {
       try {
         // Google News RSS - noticias del Mundial en español de todos los países
-        const rssUrl = 'https://news.google.com/rss/search?q=Mundial+2026+OR+FIFA+2026+OR+Copa+del+Mundo&hl=es-419&gl=US&ceid=US:es-419&when:1d';
+        const rssUrl = 'https://news.google.com/rss/search?q=Mundial+2026+OR+Copa+del+Mundo+2026+OR+FIFA+2026+OR+gol+Mundial+OR+partido+Mundial+OR+seleccion+Mundial+OR+resultado+Copa+OR+clasificacion+Mundial+OR+goleador+Mundial+OR+arbitro+Mundial+OR+cancha+Mundial+OR+estadio+Copa+OR+entrenador+Copa+OR+jugador+Mundial+OR+penalti+Copa+OR+eliminacion+Mundial+OR+octavos+Copa+OR+cuartos+Copa+OR+semifinal+Copa+OR+final+Mundial&hl=es-419&gl=US&ceid=US:es-419';
         const res = await fetch(rssUrl, {
           headers: { 'User-Agent': 'Mozilla/5.0 (compatible; QuinielaNavo/1.0)' }
         });
@@ -103,15 +103,18 @@ export default {
           const source = (item.match(/<source[^>]*>(.*?)<\/source>/) || [])[1]?.trim() || '';
           const thumb = (item.match(/<media:thumbnail[^>]*url="([^"]*)"/) || [])[1] || null;
           if(title && link) items.push({ title, url: link, publishedAt: pubDate, source: { name: source }, urlToImage: thumb });
-          if(items.length >= 10) break;
+          if(items.length >= 20) break;
         }
-        // Ordenar por fecha más reciente
+        // Ordenar por fecha más reciente y filtrar últimas 24 horas
         items.sort((a,b) => {
           const da = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
           const db2 = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
           return db2 - da;
         });
-        return new Response(JSON.stringify({ articles: items.slice(0,10) }), {
+        const hace24h = Date.now() - 24*60*60*1000;
+        const recientes = items.filter(i => i.publishedAt && new Date(i.publishedAt).getTime() > hace24h);
+        const final = recientes.length >= 5 ? recientes.slice(0,10) : items.slice(0,10);
+        return new Response(JSON.stringify({ articles: final }), {
           headers: { ...CORS, 'Cache-Control': 'public, max-age=900' }
         });
       } catch(e) {
