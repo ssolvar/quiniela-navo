@@ -1522,7 +1522,7 @@ let mundialCache = { noticias:null, standings:null, goleadores:null, fetchedAt:n
 // =============================================
 async function cargarMundial() {
   const ahora = Date.now();
-  const cache = mundialCache.fetchedAt ? (ahora - mundialCache.fetchedAt) < 30*60*1000 : false;
+  const cache = mundialCache.fetchedAt ? (ahora - mundialCache.fetchedAt) < 5*60*1000 : false;
   if(!cache) {
     await Promise.allSettled([
       fetchNoticias(),
