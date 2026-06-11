@@ -1076,7 +1076,7 @@ function renderCobertura() {
     let faltantes=0;
     const celdas=proximos.map(partido=>{
       const pred=db.predicciones.find(pr=>pr.pid===part.id&&pr.mid===partido.id);
-      if(pred)return`<td><span style="color:#ffffff;font-weight:700">${pred.g1}-${pred.g2}</span></td>`;
+      if(pred)return`<td><span style="color:#c9a227;font-weight:700">${pred.g1}-${pred.g2}</span></td>`;
       faltantes++;return`<td><span style="color:var(--rj)">✗</span></td>`;
     }).join('');
     const color=faltantes===0?'#27ae60':faltantes<=2?'#f39c12':'#e74c3c';
