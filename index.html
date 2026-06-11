@@ -235,7 +235,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 .goleador-info span{font-size:11px;color:#888}
 .goleador-goles{font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--v)}
 /* NOTICIAS */
-.noticia-item{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--grb);cursor:pointer;text-decoration:none;color:var(--tx)}
+.noticia-item{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.1);cursor:pointer;text-decoration:none;color:#fff}
 .noticia-item:last-child{border-bottom:none}
 .noticia-img{width:80px;height:60px;border-radius:8px;object-fit:cover;flex-shrink:0;background:var(--gr)}
 .noticia-body{flex:1;min-width:0}
@@ -1510,7 +1510,7 @@ function showTab(t){
 // CONFIG APIS EXTERNAS
 // =============================================
 const NEWS_API_KEY = 'dd7695a891a046fabb270718eb220064';
-const NEWS_URL = 'https://newsapi.org/v2/everything?q=%22FIFA+World+Cup+2026%22&language=es&sortBy=publishedAt&pageSize=8&apiKey='+NEWS_API_KEY;
+const NEWS_URL = 'https://newsapi.org/v2/everything?q=%22FIFA+World+Cup+2026%22&language=es&sortBy=publishedAt&pageSize=10&apiKey='+NEWS_API_KEY;
 const STANDINGS_URL = 'https://api.football-data.org/v4/competitions/WC/standings?season=2026';
 const SCORERS_URL   = 'https://api.football-data.org/v4/competitions/WC/scorers?season=2026&limit=10';
 
@@ -1578,14 +1578,14 @@ function renderNoticias() {
   if(!arts || !arts.length) {
     c.innerHTML = '<div class="empty">No hay noticias disponibles</div>'; return;
   }
-  c.innerHTML = arts.filter(a=>a.title&&a.title!=='[Removed]').map(a => {
+  c.innerHTML = arts.filter(a=>a.title&&a.title!=='[Removed]').slice(0,10).map(a => {
     const fecha = a.publishedAt ? new Date(a.publishedAt).toLocaleDateString('es-CR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'America/Costa_Rica'}) : '';
     const img = a.urlToImage ? `<img class="noticia-img" src="${a.urlToImage}" onerror="this.style.display='none'" loading="lazy">` : '';
-    return `<a class="noticia-item" href="${a.url}" target="_blank" rel="noopener">
+    return `<a class="noticia-item" href="${a.url}" target="_blank" rel="noopener" style="text-decoration:none">
       ${img}
       <div class="noticia-body">
-        <h4>${a.title}</h4>
-        <span>${a.source?.name||''} · ${fecha}</span>
+        <h4 style="color:#fff;font-weight:600">${a.title}</h4>
+        <span style="color:rgba(255,255,255,.55)">${a.source?.name||''} · ${fecha}</span>
       </div>
     </a>`;
   }).join('');
