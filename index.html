@@ -1534,12 +1534,45 @@ async function cargarMundial() {
 }
 
 async function fetchNoticias() {
+  // Usamos múltiples fuentes RSS via rss2json.com — sin CORS, gratis
+  const feeds = [
+    'https://www.marca.com/rss/futbol/mundial.xml',
+    'https://as.com/rss/tags/copa_del_mundo_2026.xml',
+  ];
+  const base = 'https://api.rss2json.com/v1/api.json?rss_url=';
   try {
-    const res = await fetch('/functions/noticias');
+    const res = await fetch(base + encodeURIComponent(feeds[0]) + '&count=8');
     if(!res.ok) throw new Error(res.status);
     const data = await res.json();
-    mundialCache.noticias = (data.articles || []).filter(a=>a.title&&a.title!=='[Removed]');
-  } catch(e) { console.error('Noticias:', e.message); mundialCache.noticias = []; }
+    if(data.items && data.items.length) {
+      mundialCache.noticias = data.items.map(item => ({
+        title:       item.title,
+        url:         item.link,
+        urlToImage:  item.thumbnail || item.enclosure?.link || null,
+        publishedAt: item.pubDate,
+        source:      { name: data.feed?.title || 'Marca' },
+        description: item.description,
+      }));
+      return;
+    }
+    throw new Error('No items');
+  } catch(e) {
+    // Fallback a segunda fuente
+    try {
+      const res2 = await fetch(base + encodeURIComponent(feeds[1]) + '&count=8');
+      const data2 = await res2.json();
+      mundialCache.noticias = (data2.items||[]).map(item => ({
+        title:       item.title,
+        url:         item.link,
+        urlToImage:  item.thumbnail || null,
+        publishedAt: item.pubDate,
+        source:      { name: 'AS' },
+      }));
+    } catch(e2) {
+      console.error('Noticias fallback error:', e2.message);
+      mundialCache.noticias = [];
+    }
+  }
 }
 
 async function fetchStandings() {
