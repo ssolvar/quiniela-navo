@@ -1534,50 +1534,20 @@ async function cargarMundial() {
 }
 
 async function fetchNoticias() {
-  // Usamos múltiples fuentes RSS via rss2json.com — sin CORS, gratis
-  const feeds = [
-    'https://www.marca.com/rss/futbol/mundial.xml',
-    'https://as.com/rss/tags/copa_del_mundo_2026.xml',
-  ];
-  const base = 'https://api.rss2json.com/v1/api.json?rss_url=';
   try {
-    const res = await fetch(base + encodeURIComponent(feeds[0]) + '&count=8');
+    const res = await fetch('/api/noticias');
     if(!res.ok) throw new Error(res.status);
     const data = await res.json();
-    if(data.items && data.items.length) {
-      mundialCache.noticias = data.items.map(item => ({
-        title:       item.title,
-        url:         item.link,
-        urlToImage:  item.thumbnail || item.enclosure?.link || null,
-        publishedAt: item.pubDate,
-        source:      { name: data.feed?.title || 'Marca' },
-        description: item.description,
-      }));
-      return;
-    }
-    throw new Error('No items');
+    mundialCache.noticias = (data.articles||[]).filter(a=>a.title&&a.title!=='[Removed]');
   } catch(e) {
-    // Fallback a segunda fuente
-    try {
-      const res2 = await fetch(base + encodeURIComponent(feeds[1]) + '&count=8');
-      const data2 = await res2.json();
-      mundialCache.noticias = (data2.items||[]).map(item => ({
-        title:       item.title,
-        url:         item.link,
-        urlToImage:  item.thumbnail || null,
-        publishedAt: item.pubDate,
-        source:      { name: 'AS' },
-      }));
-    } catch(e2) {
-      console.error('Noticias fallback error:', e2.message);
-      mundialCache.noticias = [];
-    }
+    console.error('Noticias:', e.message);
+    mundialCache.noticias = [];
   }
 }
 
 async function fetchStandings() {
   try {
-    const res = await fetch(STANDINGS_URL, { headers:{'X-Auth-Token':FOOTBALL_KEY} });
+    const res = await fetch('/api/standings');
     if(!res.ok) throw new Error(res.status);
     const data = await res.json();
     mundialCache.standings = data.standings || [];
@@ -1586,7 +1556,7 @@ async function fetchStandings() {
 
 async function fetchGoleadores() {
   try {
-    const res = await fetch(SCORERS_URL, { headers:{'X-Auth-Token':FOOTBALL_KEY} });
+    const res = await fetch('/api/scorers');
     if(!res.ok) throw new Error(res.status);
     const data = await res.json();
     mundialCache.goleadores = data.scorers || [];
