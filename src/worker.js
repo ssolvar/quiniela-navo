@@ -6,8 +6,6 @@
 
 const FOOTBALL_KEY  = '9ffbbd9890b24d43a0c2d5667a0bfbd9';
 const NEWS_KEY      = 'dd7695a891a046fabb270718eb220064';
-const JSONBIN_ID    = '6a28287ff5f4af5e29d268c7';
-const JSONBIN_KEY   = '$2a$10$RpBaOrEN5kbNEXni5oWSvOTJjNCel.lsGSo1s7cqZMYQQcDcLVLQm';
 const FOOTBALL_BASE = 'https://api.football-data.org/v4';
 const HTML_URL      = 'https://raw.githubusercontent.com/ssolvar/quiniela-navo/main/index.html';
 
@@ -91,16 +89,9 @@ export default {
           kvGet(KV, 'chat'),
           kvGet(KV, 'presencia'),
         ]);
-        // Partidos siguen en JSONBin
-        let partidos = [], partidosFetchedAt = null;
-        try {
-          const jbRes = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, {
-            headers: { 'X-Master-Key': JSONBIN_KEY, 'X-Bin-Meta': 'false' }
-          });
-          const jbData = await jbRes.json();
-          partidos = jbData.partidos || [];
-          partidosFetchedAt = jbData.partidosFetchedAt || null;
-        } catch(e) { console.error('JSONBin read error:', e.message); }
+        // Partidos en KV
+        const partidos = await kvGet(KV, 'partidos') || [];
+        const partidosFetchedAt = await kvGet(KV, 'partidosFetchedAt') || null;
 
         return new Response(JSON.stringify({
           participantes: participantes || [],
@@ -129,22 +120,9 @@ export default {
           }
         }
         // Chat NO se toca aquí — usa /api/chat
-        // Partidos van a JSONBin si vienen
-        if(body.partidos !== undefined || body.partidosFetchedAt !== undefined) {
-          writes.push((async () => {
-            const jbRes = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, {
-              headers: { 'X-Master-Key': JSONBIN_KEY, 'X-Bin-Meta': 'false' }
-            });
-            const jbData = await jbRes.json();
-            if(body.partidos) jbData.partidos = body.partidos;
-            if(body.partidosFetchedAt) jbData.partidosFetchedAt = body.partidosFetchedAt;
-            await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_KEY },
-              body: JSON.stringify(jbData)
-            });
-          })());
-        }
+        // Partidos en KV
+        if(body.partidos !== undefined) writes.push(kvSet(KV, 'partidos', body.partidos));
+        if(body.partidosFetchedAt !== undefined) writes.push(kvSet(KV, 'partidosFetchedAt', body.partidosFetchedAt));
         await Promise.all(writes);
         return new Response(JSON.stringify({ ok: true }), { headers: CORS });
       } catch(e) {
@@ -236,19 +214,12 @@ export default {
         });
         const data = await res.json();
         const partidos = (data.matches||[]).map(normPartido);
-        // Guardar en JSONBin
-        const jbRes = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, {
-          headers: { 'X-Master-Key': JSONBIN_KEY, 'X-Bin-Meta': 'false' }
-        });
-        const jbData = await jbRes.json();
-        jbData.partidos = partidos;
-        jbData.partidosFetchedAt = new Date().toISOString();
-        await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_KEY },
-          body: JSON.stringify(jbData)
-        });
-        return new Response(JSON.stringify({ partidos }), {
+        const partidosFetchedAt = new Date().toISOString();
+        await Promise.all([
+          kvSet(KV, 'partidos', partidos),
+          kvSet(KV, 'partidosFetchedAt', partidosFetchedAt)
+        ]);
+        return new Response(JSON.stringify({ partidos, partidosFetchedAt }), {
           headers: { ...CORS, 'Cache-Control': 'public, max-age=60' }
         });
       } catch(e) {
