@@ -586,14 +586,15 @@ async function actualizarPartidosSiNecesario() {
   const ahora = Date.now();
   const ultimoFetch = db.partidosFetchedAt ? new Date(db.partidosFetchedAt).getTime() : 0;
   const hayLive = db.partidos.some(p=>p.status==='LIVE'||p.status==='HT');
-  const intervalo = hayLive ? 2*60*1000 : 60*60*1000; // 2min si en vivo, 1h si no
+  const intervalo = hayLive ? 2*60*1000 : 60*60*1000;
   if((ahora - ultimoFetch) < intervalo) return;
 
   try {
-    const res = await fetch(FOOTBALL_URL, {headers:{'X-Auth-Token':FOOTBALL_KEY}});
-    if(!res.ok) throw new Error('Football API: '+res.status);
+    // Llamar al Worker como proxy — sin CORS
+    const res = await fetch('/api/partidos');
+    if(!res.ok) throw new Error('Partidos API: '+res.status);
     const data = await res.json();
-    db.partidos = (data.matches||[]).map(normPartido);
+    db.partidos = data.partidos || db.partidos;
     db.partidosFetchedAt = new Date().toISOString();
     await dbWrite(db);
   } catch(e) { console.error('Football API error:', e.message); }
