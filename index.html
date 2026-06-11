@@ -1623,85 +1623,147 @@ function renderStatsQuiniela() {
   const pts = calcPuntos();
   const ranking = [...db.participantes].sort((a,b)=>(pts[b.id]||0)-(pts[a.id]||0));
   const partTerminados = db.partidos.filter(p=>p.status==='FT');
+  const totalPreds = db.predicciones.length;
+  const lider = ranking[0];
+  const ultimo = ranking[ranking.length-1];
 
-  // Predicción más popular por partido
+  // Predicción más popular
   let predMasPopular = '';
-  if(db.predicciones.length && partTerminados.length) {
+  if(totalPreds && partTerminados.length) {
     const counts = {};
-    db.predicciones.forEach(pr => {
-      const key = pr.g1+'-'+pr.g2;
-      counts[key] = (counts[key]||0)+1;
-    });
+    db.predicciones.forEach(pr => { const k=pr.g1+'-'+pr.g2; counts[k]=(counts[k]||0)+1; });
     const top = Object.entries(counts).sort((a,b)=>b[1]-a[1])[0];
     if(top) predMasPopular = `${top[0]} (${top[1]} persona${top[1]!==1?'s':''})`;
   }
 
   // Racha máxima
-  let rachaMax = 0, rachaPersona = '';
+  let rachaMax=0, rachaPersona='';
   db.participantes.forEach(part => {
-    let racha = 0, maxRacha = 0;
+    let racha=0, maxRacha=0;
     partTerminados.forEach(par => {
-      const pred = db.predicciones.find(pr=>pr.pid===part.id&&pr.mid===par.id);
-      if(pred && resultado(pred.g1,pred.g2)===resultado(par.g1,par.g2)) { racha++; maxRacha=Math.max(maxRacha,racha); }
-      else racha = 0;
+      const pred=db.predicciones.find(pr=>pr.pid===part.id&&pr.mid===par.id);
+      if(pred&&resultado(pred.g1,pred.g2)===resultado(par.g1,par.g2)){racha++;maxRacha=Math.max(maxRacha,racha);}
+      else racha=0;
     });
-    if(maxRacha > rachaMax) { rachaMax=maxRacha; rachaPersona=part.nombre; }
+    if(maxRacha>rachaMax){rachaMax=maxRacha;rachaPersona=part.nombre;}
   });
 
-  // % grupo que predijo empates
-  const totalPreds = db.predicciones.length;
+  // % empates predichos
   const empates = db.predicciones.filter(pr=>pr.g1===pr.g2).length;
   const pctEmpate = totalPreds ? Math.round((empates/totalPreds)*100) : 0;
 
   // Partido más acertado
-  let mejorPartido = '', mejorPct = 0;
+  let mejorPartido='', mejorPct=0;
   partTerminados.forEach(par => {
-    const predsPartido = db.predicciones.filter(pr=>pr.mid===par.id);
-    if(!predsPartido.length) return;
-    const acertados = predsPartido.filter(pr=>resultado(pr.g1,pr.g2)===resultado(par.g1,par.g2)).length;
-    const pct = Math.round((acertados/predsPartido.length)*100);
-    if(pct>mejorPct) { mejorPct=pct; mejorPartido=`${par.local} vs ${par.visitante} (${pct}%)`; }
+    const pp=db.predicciones.filter(pr=>pr.mid===par.id);
+    if(!pp.length) return;
+    const ac=pp.filter(pr=>resultado(pr.g1,pr.g2)===resultado(par.g1,par.g2)).length;
+    const pct=Math.round((ac/pp.length)*100);
+    if(pct>mejorPct){mejorPct=pct;mejorPartido=`${par.local} vs ${par.visitante} (${pct}%)`;}
   });
 
-  const lider = ranking[0];
-  const ultimo = ranking[ranking.length-1];
+  // Partido más aburrido y más goleador
+  let masGolesPart='', masGolesN=0, menosGolesPart='', menosGolesN=99;
+  partTerminados.forEach(par => {
+    const t=(par.g1||0)+(par.g2||0);
+    if(t>masGolesN){masGolesN=t;masGolesPart=`${par.local} vs ${par.visitante} (${par.g1}-${par.g2})`;}
+    if(t<menosGolesN){menosGolesN=t;menosGolesPart=`${par.local} vs ${par.visitante} (${par.g1}-${par.g2})`;}
+  });
 
-  // Stats adicionales
-  const totalPartidos = db.partidos.length;
-  const predsPorPart = totalPreds > 0 ? Math.round(totalPreds / Math.max(db.participantes.length,1)) : 0;
-  
-  // Participante con más exactos
-  let masExactos = 0, masExactosNombre = '';
+  // Equipo más goleador
+  const golesEquipo={};
+  partTerminados.forEach(par => {
+    golesEquipo[par.local]=(golesEquipo[par.local]||0)+(par.g1||0);
+    golesEquipo[par.visitante]=(golesEquipo[par.visitante]||0)+(par.g2||0);
+  });
+  const topEquipo=Object.entries(golesEquipo).sort((a,b)=>b[1]-a[1])[0];
+
+  // Más exactos
+  let masExactos=0, masExactosNombre='';
   db.participantes.forEach(part => {
-    let ex = 0;
+    let ex=0;
     partTerminados.forEach(par => {
-      const pred = db.predicciones.find(pr=>pr.pid===part.id&&pr.mid===par.id);
+      const pred=db.predicciones.find(pr=>pr.pid===part.id&&pr.mid===par.id);
       if(pred&&pred.g1===par.g1&&pred.g2===par.g2) ex++;
     });
-    if(ex > masExactos) { masExactos=ex; masExactosNombre=part.nombre; }
+    if(ex>masExactos){masExactos=ex;masExactosNombre=part.nombre;}
   });
 
-  // Promedio de goles predichos
-  const totalGolesPredichos = db.predicciones.reduce((s,p)=>s+(p.g1||0)+(p.g2||0),0);
-  const promedioGoles = totalPreds > 0 ? (totalGolesPredichos/totalPreds).toFixed(1) : 0;
-
-  // Participante con más predicciones
-  let masPreds = 0, masPredsNombre = '';
+  // Más optimista (más goles predichos en promedio)
+  let masOptimistaNombre='', masOptimistaGoles=0;
+  let masPesimistaNombre='', masPesimistaGoles=99;
   db.participantes.forEach(part => {
-    const n = db.predicciones.filter(p=>p.pid===part.id).length;
-    if(n > masPreds) { masPreds=n; masPredsNombre=part.nombre; }
+    const pp=db.predicciones.filter(p=>p.pid===part.id);
+    if(!pp.length) return;
+    const avg=pp.reduce((s,p)=>s+(p.g1||0)+(p.g2||0),0)/pp.length;
+    if(avg>masOptimistaGoles){masOptimistaGoles=avg;masOptimistaNombre=part.nombre;}
+    if(avg<masPesimistaGoles){masPesimistaGoles=avg;masPesimistaNombre=part.nombre;}
   });
+
+  // Peor predicción (más diferencia con resultado real)
+  let peorPredNombre='', peorPredDiff=0, peorPredDesc='';
+  partTerminados.forEach(par => {
+    db.predicciones.filter(pr=>pr.mid===par.id).forEach(pred => {
+      const diff=Math.abs((pred.g1||0)-par.g1)+Math.abs((pred.g2||0)-par.g2);
+      if(diff>peorPredDiff){
+        peorPredDiff=diff;
+        const part=db.participantes.find(p=>p.id===pred.pid);
+        peorPredNombre=part?part.nombre:'';
+        peorPredDesc=`${pred.g1}-${pred.g2} vs real ${par.g1}-${par.g2}`;
+      }
+    });
+  });
+
+  // Sniper (% exactos sobre partidos jugados con predicción)
+  let sniperNombre='', sniperPct=0;
+  db.participantes.forEach(part => {
+    const conPred=partTerminados.filter(par=>db.predicciones.find(pr=>pr.pid===part.id&&pr.mid===par.id));
+    if(conPred.length<2) return;
+    const ex=conPred.filter(par=>{const pred=db.predicciones.find(pr=>pr.pid===part.id&&pr.mid===par.id);return pred&&pred.g1===par.g1&&pred.g2===par.g2;}).length;
+    const pct=Math.round((ex/conPred.length)*100);
+    if(pct>sniperPct){sniperPct=pct;sniperNombre=part.nombre;}
+  });
+
+  // El frío (más partidos sin acertar nada)
+  let elFrioNombre='', elFrioN=0;
+  db.participantes.forEach(part => {
+    const sinAcertar=partTerminados.filter(par=>{
+      const pred=db.predicciones.find(pr=>pr.pid===part.id&&pr.mid===par.id);
+      return pred&&resultado(pred.g1,pred.g2)!==resultado(par.g1,par.g2);
+    }).length;
+    if(sinAcertar>elFrioN){elFrioN=sinAcertar;elFrioNombre=part.nombre;}
+  });
+
+  // Al ritmo del campeón (proyección final)
+  let proyeccion='';
+  if(lider&&partTerminados.length>0){
+    const ptsPorPartido=(pts[lider.id]||0)/partTerminados.length;
+    const proyectado=Math.round(ptsPorPartido*db.partidos.length);
+    proyeccion=`${lider.nombre} · ~${proyectado} pts al final`;
+  }
+
+  // Promedio goles predichos
+  const totalGolesPredichos=db.predicciones.reduce((s,p)=>s+(p.g1||0)+(p.g2||0),0);
+  const promedioGoles=totalPreds?(totalGolesPredichos/totalPreds).toFixed(1):0;
 
   const stats = [
     lider ? { label:'🥇 Va ganando', value:`${lider.nombre} · ${pts[lider.id]||0} pts` } : null,
     ultimo&&lider&&lider.id!==ultimo.id ? { label:'🏳️ Va último', value:`${ultimo.nombre} · ${pts[ultimo.id]||0} pts` } : null,
-    rachaMax>0 ? { label:'🔥 Mejor racha actual', value:`${rachaPersona} · ${rachaMax} seguidos` } : null,
-    masExactos>0 ? { label:'🎯 Más marcadores exactos', value:`${masExactosNombre} · ${masExactos} exacto${masExactos!==1?'s':''}` } : null,
+    rachaMax>0 ? { label:'🔥 Mejor racha', value:`${rachaPersona} · ${rachaMax} seguidos` } : null,
+    sniperNombre&&sniperPct>0 ? { label:'🎯 Sniper (% exactos)', value:`${sniperNombre} · ${sniperPct}%` } : null,
+    masExactos>0 ? { label:'💎 Más marcadores exactos', value:`${masExactosNombre} · ${masExactos} exacto${masExactos!==1?'s':''}` } : null,
+    peorPredNombre ? { label:'💥 Peor predicción', value:`${peorPredNombre} · ${peorPredDesc}` } : null,
     predMasPopular ? { label:'📊 Predicción más popular', value:predMasPopular } : null,
     mejorPartido ? { label:'✅ Partido más acertado', value:mejorPartido } : null,
-    masPredsNombre ? { label:'📝 Más comprometido', value:`${masPredsNombre} · ${masPreds} predicciones` } : null,
+    masGolesPart ? { label:'⚽ Partido más goleador', value:masGolesPart } : null,
+    menosGolesPart&&partTerminados.length>1 ? { label:'😴 Partido más aburrido', value:menosGolesPart } : null,
+    topEquipo ? { label:'🔥 Equipo más goleador', value:`${topEquipo[0]} · ${topEquipo[1]} goles` } : null,
+    masOptimistaNombre ? { label:'🎲 Más optimista', value:`${masOptimistaNombre} · ${masOptimistaGoles.toFixed(1)} goles/partido` } : null,
+    masPesimistaNombre&&masPesimistaNombre!==masOptimistaNombre ? { label:'😅 Más pesimista', value:`${masPesimistaNombre} · ${masPesimistaGoles.toFixed(1)} goles/partido` } : null,
+    elFrioNombre&&elFrioN>0 ? { label:'🧊 El frío', value:`${elFrioNombre} · ${elFrioN} partidos sin acertar` } : null,
     totalPreds>0 ? { label:'🤝 Predicen empate', value:`${pctEmpate}% del grupo` } : null,
     totalPreds>0 ? { label:'⚽ Promedio goles predichos', value:`${promedioGoles} goles/partido` } : null,
+    proyeccion ? { label:'🏆 Al ritmo del campeón', value:proyeccion } : null,
     lider&&ultimo&&lider.id!==ultimo.id ? { label:'📏 Diferencia líder-último', value:`${(pts[lider.id]||0)-(pts[ultimo.id]||0)} pts` } : null,
   ].filter(Boolean);
 
@@ -1709,7 +1771,7 @@ function renderStatsQuiniela() {
     c.innerHTML = '<div class="card"><div class="empty">Las stats aparecerán cuando terminen partidos</div></div>'; return;
   }
   c.innerHTML = '<div class="card">'
-    + stats.map((s,i)=>`<div class="stat-item">
+    + stats.map(s=>`<div class="stat-item">
         <span class="stat-item-label" style="color:#dde4ff">${s.label}</span>
         <span class="stat-item-value" style="color:#4fc3f7;font-weight:700">${s.value}</span>
       </div>`).join('')
