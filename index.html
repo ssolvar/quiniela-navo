@@ -209,6 +209,46 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 .toast{position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;max-width:90vw;text-align:center}
 .toast.show{opacity:1}
 
+/* MUNDIAL TAB */
+.mundial-section{margin-bottom:14px}
+.mundial-section h3{font-family:'Bebas Neue',sans-serif;font-size:17px;letter-spacing:1px;color:var(--do);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+/* STANDINGS */
+.standings-groups{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
+.standing-group{background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 6px rgba(0,0,0,.08)}
+.standing-group-title{background:var(--v);color:#fff;padding:7px 12px;font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:1px}
+.standing-table{width:100%;border-collapse:collapse;font-size:12px}
+.standing-table th{padding:5px 7px;color:#888;font-weight:600;border-bottom:1px solid var(--grb);text-align:center;font-size:10px}
+.standing-table th:first-child{text-align:left}
+.standing-table td{padding:6px 7px;border-bottom:1px solid var(--grb);text-align:center}
+.standing-table td:first-child{text-align:left}
+.standing-table tr:last-child td{border-bottom:none}
+.standing-table tr.clasifica td{background:#f0fff8}
+.standing-pos{display:inline-flex;width:18px;height:18px;border-radius:50%;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;background:#ccc;margin-right:4px}
+.standing-pos.q{background:var(--v)}
+.standing-pos.tbd{background:#f0b429}
+/* GOLEADORES */
+.goleador-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--grb)}
+.goleador-item:last-child{border-bottom:none}
+.goleador-rank{font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--do);min-width:28px;text-align:center}
+.goleador-info{flex:1}
+.goleador-info strong{font-size:14px;display:block}
+.goleador-info span{font-size:11px;color:#888}
+.goleador-goles{font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--v)}
+/* NOTICIAS */
+.noticia-item{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--grb);cursor:pointer;text-decoration:none;color:var(--tx)}
+.noticia-item:last-child{border-bottom:none}
+.noticia-img{width:80px;height:60px;border-radius:8px;object-fit:cover;flex-shrink:0;background:var(--gr)}
+.noticia-body{flex:1;min-width:0}
+.noticia-body h4{font-size:13px;font-weight:600;line-height:1.3;margin-bottom:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.noticia-body span{font-size:11px;color:#888}
+/* STATS */
+.stat-item{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--grb);font-size:13px}
+.stat-item:last-child{border-bottom:none}
+.stat-item-label{color:#555;flex:1}
+.stat-item-value{font-weight:700;color:var(--v);text-align:right}
+.stat-curiosidad{background:linear-gradient(135deg,#1a3a2a,#0f5c35);border-radius:10px;padding:10px 14px;color:#fff;font-size:13px;margin-bottom:8px;border-left:4px solid var(--do)}
+
+/* COBERTURA */
 /* COBERTURA */
 .cob-table{width:100%;border-collapse:collapse;font-size:11px}
 .cob-table th{padding:4px 5px;color:#666;font-weight:600;border-bottom:1px solid var(--grb);text-align:center;min-width:44px}
@@ -316,6 +356,25 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
   <div id="card-add-lugar" style="display:none"></div>
 </div>
 
+<div id="tab-mundial" class="panel">
+  <div class="mundial-section">
+    <h3>📰 Noticias del Mundial</h3>
+    <div id="noticias-cont"><div class="loading">Cargando noticias...</div></div>
+  </div>
+  <div class="mundial-section">
+    <h3>⚽ Top Goleadores</h3>
+    <div id="goleadores-cont"><div class="loading">Cargando goleadores...</div></div>
+  </div>
+  <div class="mundial-section">
+    <h3>🎯 Stats de la Quiniela</h3>
+    <div id="stats-quiniela-cont"></div>
+  </div>
+  <div class="mundial-section">
+    <h3>🏅 Standings de Grupos</h3>
+    <div class="standings-groups" id="standings-cont"><div class="loading">Cargando standings...</div></div>
+  </div>
+</div>
+
 </div><!-- /app -->
 
 <nav class="tabs">
@@ -325,6 +384,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
   <button class="tab" id="tnav-predicciones" onclick="showTab('predicciones')"><span class="tab-icon">🎯</span>Predecir</button>
   <button class="tab" id="tnav-grupo" onclick="showTab('grupo')"><span class="tab-icon">👥</span>Grupo</button>
   <button class="tab" id="tnav-premios" onclick="showTab('premios')"><span class="tab-icon">🎁</span>Premios</button>
+  <button class="tab" id="tnav-mundial" onclick="showTab('mundial')"><span class="tab-icon">🌍</span>Mundial</button>
 </nav>
 </div>
 
@@ -1442,6 +1502,218 @@ function showTab(t){
   document.getElementById('tab-'+t).classList.add('active');
   document.getElementById('tnav-'+t).classList.add('active');
   aplicarRol();renderAll();
+  if(t==='mundial') cargarMundial();
+}
+
+// =============================================
+// CONFIG APIS EXTERNAS
+// =============================================
+const NEWS_API_KEY = 'dd7695a891a046fabb270718eb220064';
+const NEWS_URL = 'https://newsapi.org/v2/everything?q=%22FIFA+World+Cup+2026%22&language=es&sortBy=publishedAt&pageSize=8&apiKey='+NEWS_API_KEY;
+const STANDINGS_URL = 'https://api.football-data.org/v4/competitions/WC/standings?season=2026';
+const SCORERS_URL   = 'https://api.football-data.org/v4/competitions/WC/scorers?season=2026&limit=10';
+
+// Cache para no repetir llamadas
+let mundialCache = { noticias:null, standings:null, goleadores:null, fetchedAt:null };
+
+// =============================================
+// MUNDIAL — FETCH Y RENDER
+// =============================================
+async function cargarMundial() {
+  const ahora = Date.now();
+  const cache = mundialCache.fetchedAt ? (ahora - mundialCache.fetchedAt) < 30*60*1000 : false;
+  if(!cache) {
+    await Promise.allSettled([
+      fetchNoticias(),
+      fetchStandings(),
+      fetchGoleadores(),
+    ]);
+    mundialCache.fetchedAt = ahora;
+  }
+  renderMundial();
+}
+
+async function fetchNoticias() {
+  try {
+    const res = await fetch(NEWS_URL);
+    if(!res.ok) throw new Error(res.status);
+    const data = await res.json();
+    mundialCache.noticias = data.articles || [];
+  } catch(e) { console.error('News API:', e.message); mundialCache.noticias = []; }
+}
+
+async function fetchStandings() {
+  try {
+    const res = await fetch(STANDINGS_URL, { headers:{'X-Auth-Token':FOOTBALL_KEY} });
+    if(!res.ok) throw new Error(res.status);
+    const data = await res.json();
+    mundialCache.standings = data.standings || [];
+  } catch(e) { console.error('Standings:', e.message); mundialCache.standings = []; }
+}
+
+async function fetchGoleadores() {
+  try {
+    const res = await fetch(SCORERS_URL, { headers:{'X-Auth-Token':FOOTBALL_KEY} });
+    if(!res.ok) throw new Error(res.status);
+    const data = await res.json();
+    mundialCache.goleadores = data.scorers || [];
+  } catch(e) { console.error('Scorers:', e.message); mundialCache.goleadores = []; }
+}
+
+function renderMundial() {
+  renderNoticias();
+  renderGoleadores();
+  renderStatsQuiniela();
+  renderStandings();
+}
+
+function renderNoticias() {
+  const c = document.getElementById('noticias-cont');
+  if(!c) return;
+  const arts = mundialCache.noticias;
+  if(!arts || !arts.length) {
+    c.innerHTML = '<div class="empty">No hay noticias disponibles</div>'; return;
+  }
+  c.innerHTML = arts.filter(a=>a.title&&a.title!=='[Removed]').map(a => {
+    const fecha = a.publishedAt ? new Date(a.publishedAt).toLocaleDateString('es-CR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'America/Costa_Rica'}) : '';
+    const img = a.urlToImage ? `<img class="noticia-img" src="${a.urlToImage}" onerror="this.style.display='none'" loading="lazy">` : '';
+    return `<a class="noticia-item" href="${a.url}" target="_blank" rel="noopener">
+      ${img}
+      <div class="noticia-body">
+        <h4>${a.title}</h4>
+        <span>${a.source?.name||''} · ${fecha}</span>
+      </div>
+    </a>`;
+  }).join('');
+}
+
+function renderGoleadores() {
+  const c = document.getElementById('goleadores-cont');
+  if(!c) return;
+  const scorers = mundialCache.goleadores;
+  if(!scorers || !scorers.length) {
+    c.innerHTML = '<div class="empty">Los goleadores aparecerán cuando empiece el torneo</div>'; return;
+  }
+  const medals = ['🥇','🥈','🥉'];
+  c.innerHTML = '<div class="card">' + scorers.slice(0,10).map((s,i) => {
+    const equipo = s.team?.name || s.team?.shortName || '';
+    const equipoCod = s.team?.tla || '';
+    return `<div class="goleador-item">
+      <span class="goleador-rank">${medals[i]||'#'+(i+1)}</span>
+      <div class="goleador-info">
+        <strong>${s.player?.name||'?'}</strong>
+        <span>${banderas(equipoCod)} ${equipo}</span>
+      </div>
+      <span class="goleador-goles">${s.goals||s.numberOfGoals||0} ⚽</span>
+    </div>`;
+  }).join('') + '</div>';
+}
+
+function renderStatsQuiniela() {
+  const c = document.getElementById('stats-quiniela-cont');
+  if(!c) return;
+  if(!db.participantes.length) {
+    c.innerHTML = '<div class="empty">Agrega participantes para ver stats</div>'; return;
+  }
+
+  const pts = calcPuntos();
+  const ranking = [...db.participantes].sort((a,b)=>(pts[b.id]||0)-(pts[a.id]||0));
+  const partTerminados = db.partidos.filter(p=>p.status==='FT');
+
+  // Predicción más popular por partido
+  let predMasPopular = '';
+  if(db.predicciones.length && partTerminados.length) {
+    const counts = {};
+    db.predicciones.forEach(pr => {
+      const key = pr.g1+'-'+pr.g2;
+      counts[key] = (counts[key]||0)+1;
+    });
+    const top = Object.entries(counts).sort((a,b)=>b[1]-a[1])[0];
+    if(top) predMasPopular = `${top[0]} (${top[1]} persona${top[1]!==1?'s':''})`;
+  }
+
+  // Racha máxima
+  let rachaMax = 0, rachaPersona = '';
+  db.participantes.forEach(part => {
+    let racha = 0, maxRacha = 0;
+    partTerminados.forEach(par => {
+      const pred = db.predicciones.find(pr=>pr.pid===part.id&&pr.mid===par.id);
+      if(pred && resultado(pred.g1,pred.g2)===resultado(par.g1,par.g2)) { racha++; maxRacha=Math.max(maxRacha,racha); }
+      else racha = 0;
+    });
+    if(maxRacha > rachaMax) { rachaMax=maxRacha; rachaPersona=part.nombre; }
+  });
+
+  // % grupo que predijo empates
+  const totalPreds = db.predicciones.length;
+  const empates = db.predicciones.filter(pr=>pr.g1===pr.g2).length;
+  const pctEmpate = totalPreds ? Math.round((empates/totalPreds)*100) : 0;
+
+  // Partido más acertado
+  let mejorPartido = '', mejorPct = 0;
+  partTerminados.forEach(par => {
+    const predsPartido = db.predicciones.filter(pr=>pr.mid===par.id);
+    if(!predsPartido.length) return;
+    const acertados = predsPartido.filter(pr=>resultado(pr.g1,pr.g2)===resultado(par.g1,par.g2)).length;
+    const pct = Math.round((acertados/predsPartido.length)*100);
+    if(pct>mejorPct) { mejorPct=pct; mejorPartido=`${par.local} vs ${par.visitante} (${pct}%)`; }
+  });
+
+  const lider = ranking[0];
+  const ultimo = ranking[ranking.length-1];
+
+  const stats = [
+    lider ? { label:`🥇 Va ganando`, value:`${lider.nombre} con ${pts[lider.id]||0} pts` } : null,
+    rachaMax>0 ? { label:`🔥 Mejor racha`, value:`${rachaPersona} (${rachaMax} seguidos)` } : null,
+    predMasPopular ? { label:`🎯 Predicción más popular`, value:predMasPopular } : null,
+    mejorPartido ? { label:`✅ Partido más acertado`, value:mejorPartido } : null,
+    totalPreds>0 ? { label:`🤝 Predicen empate`, value:`${pctEmpate}% del grupo` } : null,
+    lider&&ultimo&&lider.id!==ultimo.id ? { label:`📊 Diferencia líder-último`, value:`${(pts[lider.id]||0)-(pts[ultimo.id]||0)} pts` } : null,
+  ].filter(Boolean);
+
+  if(!stats.length) {
+    c.innerHTML = '<div class="card"><div class="empty">Las stats aparecerán cuando terminen partidos</div></div>'; return;
+  }
+  c.innerHTML = '<div class="card">'
+    + stats.map(s=>`<div class="stat-item"><span class="stat-item-label">${s.label}</span><span class="stat-item-value">${s.value}</span></div>`).join('')
+    + '</div>';
+}
+
+function renderStandings() {
+  const c = document.getElementById('standings-cont');
+  if(!c) return;
+  const standings = mundialCache.standings;
+  if(!standings || !standings.length) {
+    c.innerHTML = '<div class="empty" style="color:rgba(255,255,255,.5)">Los standings aparecerán cuando empiece el torneo</div>';
+    return;
+  }
+  c.innerHTML = standings.map(grp => {
+    const grupoNom = grp.group || 'Grupo';
+    const tabla = grp.table || [];
+    const rows = tabla.map((t,i) => {
+      const clasifica = i < 2; // top 2 clasifican
+      const posClass = clasifica ? 'q' : 'tbd';
+      return `<tr class="${clasifica?'clasifica':''}">
+        <td><span class="standing-pos ${posClass}">${t.position}</span>${banderas(t.team?.tla||'')} ${t.team?.shortName||t.team?.name||''}</td>
+        <td>${t.playedGames||0}</td>
+        <td>${t.won||0}</td>
+        <td>${t.draw||0}</td>
+        <td>${t.lost||0}</td>
+        <td>${t.goalsFor||0}</td>
+        <td>${t.goalsAgainst||0}</td>
+        <td><strong>${t.points||0}</strong></td>
+      </tr>`;
+    }).join('');
+    return `<div class="standing-group">
+      <div class="standing-group-title">🏆 ${grupoNom}</div>
+      <table class="standing-table">
+        <thead><tr>
+          <th>Equipo</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>Pts</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  }).join('');
 }
 
 // =============================================
@@ -1458,6 +1730,7 @@ function renderAll(){
   renderMiPerfil();
   renderParticipantes();
   renderPremios();
+  renderStatsQuiniela();
 }
 
 // =============================================
