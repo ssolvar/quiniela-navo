@@ -325,7 +325,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v2.1</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v2.2</p>
 </header>
 
 <div class="topbar">
@@ -384,6 +384,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 <div id="tab-predicciones" class="panel">
   <div class="card"><h2>🎯 Mi predicción</h2><div id="pred-form-cont"></div></div>
   <div class="card"><h2>📊 Cobertura</h2><p style="font-size:12px;color:#888;margin-bottom:8px">Predicciones registradas por partido</p><div id="cobertura-cont"></div></div>
+  <div class="card"><h2>🎲 Retos</h2><p style="font-size:12px;color:#8899cc;margin-bottom:8px">Respuestas de retos por partido</p><div id="retos-tabla-cont"></div></div>
   <div class="card"><h2>📋 Mis predicciones</h2><div id="preds-cont"></div></div>
 </div>
 
@@ -1980,6 +1981,89 @@ function iniciarChatTimer() {
 }
 
 // =============================================
+// TABLA DE RETOS
+// =============================================
+function renderRetosTabla() {
+  const c = document.getElementById('retos-tabla-cont');
+  if(!c) return;
+
+  // Partidos que tienen reto asignado
+  const partidos = db.partidos.filter(p => {
+    const reto = getRetoPartido(p.id);
+    return !!reto && (p.local!=='TBD' && p.visitante!=='TBD');
+  }).sort((a,b) => new Date(a.fecha+'T'+(a.hora||'00:00')+':00Z') - new Date(b.fecha+'T'+(b.hora||'00:00')+':00Z'));
+
+  if(!partidos.length) {
+    c.innerHTML = '<div class="empty">Los retos aparecerán 2 horas antes de cada partido</div>';
+    return;
+  }
+
+  if(!db.participantes.length) {
+    c.innerHTML = '<div class="empty">Agrega participantes primero</div>';
+    return;
+  }
+
+  const headers = partidos.map(p => {
+    const reto = getRetoPartido(p.id);
+    const isFT = p.status === 'FT';
+    const correcta = reto?.resultado || null;
+    return `<th style="padding:5px;font-size:10px;color:#8899cc;font-weight:600;border-bottom:1px solid #1a2a70;text-align:center;min-width:90px">
+      <div>${banderas(p.localCod)} ${p.local.split(' ')[0]}</div>
+      <div style="color:#6677aa;font-size:9px">vs ${p.visitante.split(' ')[0]} ${banderas(p.visitanteCod)}</div>
+      ${correcta ? `<div style="color:#c9a227;font-size:9px;margin-top:2px">✓ ${correcta}</div>` : ''}
+    </th>`;
+  }).join('');
+
+  const rows = db.participantes.map(part => {
+    const celdas = partidos.map(p => {
+      const reto = getRetoPartido(p.id);
+      if(!reto) return '<td style="text-align:center;padding:5px;border-bottom:1px solid #1a2a70"><span style="color:#6677aa">—</span></td>';
+      
+      const respuesta = reto.respuestas?.[part.id] || null;
+      const correcta = reto.resultado || null;
+      const isFT = p.status === 'FT';
+      
+      let color = '#c9a227'; // dorado = respondido
+      let icon = '';
+      if(!respuesta) {
+        color = '#c8102e';
+        return `<td style="text-align:center;padding:5px;border-bottom:1px solid #1a2a70"><span style="color:${color}">✗</span></td>`;
+      }
+      if(isFT && correcta) {
+        color = respuesta === correcta ? '#4caf50' : '#c8102e';
+        icon = respuesta === correcta ? ' ✅' : ' ❌';
+      }
+      
+      // Abreviar respuesta
+      const resp = respuesta.length > 12 ? respuesta.slice(0,12)+'…' : respuesta;
+      return `<td style="text-align:center;padding:5px;border-bottom:1px solid #1a2a70;font-size:11px">
+        <span style="color:${color};font-weight:600">${resp}${icon}</span>
+      </td>`;
+    }).join('');
+
+    return `<tr>
+      <td style="padding:5px 8px;border-bottom:1px solid #1a2a70">
+        <div style="display:flex;align-items:center;gap:6px">
+          ${avatarHtml(part)}
+          <span style="font-size:12px;font-weight:600;color:#ffffff">${part.nombre}</span>
+        </div>
+      </td>
+      ${celdas}
+    </tr>`;
+  }).join('');
+
+  c.innerHTML = `<div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr>
+        <th style="padding:5px 8px;font-size:11px;color:#8899cc;font-weight:600;border-bottom:1px solid #1a2a70;text-align:left;min-width:90px">Participante</th>
+        ${headers}
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+// =============================================
 // RENDER ALL
 // =============================================
 function renderAll(){
@@ -1994,6 +2078,7 @@ function renderAll(){
   renderMiPerfil();
   renderParticipantes();
   renderPremios();
+  renderRetosTabla();
   renderStatsQuiniela();
 }
 
