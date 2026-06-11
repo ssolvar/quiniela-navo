@@ -325,7 +325,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v2.9</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v3.1</p>
 </header>
 
 <div class="topbar">
@@ -566,7 +566,7 @@ async function dbRead() {
     partidos:      data.partidos||[],
     retos:         data.retos||[],
     presencia:     data.presencia||[],
-    chat:          data.chat||[],
+    chat:          db.chat||[], // NUNCA sobreescribir chat desde /api/db
     partidosFetchedAt: data.partidosFetchedAt||null,
   };
 }
@@ -585,10 +585,11 @@ async function cargarDatos() {
   try {
     const [fresh, chatRes] = await Promise.all([
       dbRead(),
-      fetch('/api/chat').then(r=>r.json()).catch(()=>({chat:[]}))
+      fetch('/api/chat').then(r=>r.json()).catch(()=>({chat:db.chat||[]}))
     ]);
+    const chatGuardado = chatRes.chat && chatRes.chat.length > 0 ? chatRes.chat : db.chat || [];
     db = fresh;
-    db.chat = chatRes.chat || [];
+    db.chat = chatGuardado; // siempre preservar chat
     // Actualizar partidos si hace >1h o si hay partido en vivo (cada 2 min)
     await actualizarPartidosSiNecesario();
     // Asignar retos a partidos que los necesiten
@@ -672,6 +673,7 @@ function iniciarTimers() {
           dbRead(),
           fetch('/api/chat').then(r=>r.json()).catch(()=>({chat:db.chat||[]}))
         ]);
+        if(chatRes.chat && chatRes.chat.length > 0) db.chat = chatRes.chat;
         db.presencia = fresh.presencia||[];
         db.predicciones = fresh.predicciones||[];
         db.retos = fresh.retos||[];
