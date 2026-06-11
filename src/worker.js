@@ -1,3 +1,9 @@
+// ================================================
+// CLOUDFLARE WORKER — Quiniela Los del Navo 2026
+// DB: Cloudflare KV (participantes, predicciones, premios, retos, chat, presencia)
+// Partidos: JSONBin (cache, pocas llamadas)
+// ================================================
+
 const FOOTBALL_KEY  = '9ffbbd9890b24d43a0c2d5667a0bfbd9';
 const NEWS_KEY      = 'dd7695a891a046fabb270718eb220064';
 const JSONBIN_ID    = '6a28287ff5f4af5e29d268c7';
@@ -30,23 +36,213 @@ function normPartido(m) {
   };
 }
 
+// ---- KV helpers ----
+async function kvGet(kv, key) {
+  const val = await kv.get(key);
+  if(!val) return null;
+  try { return JSON.parse(val); } catch { return null; }
+}
+
+async function kvSet(kv, key, value) {
+  await kv.put(key, JSON.stringify(value));
+}
+
 export default {
   async fetch(request, env) {
     const url  = new URL(request.url);
     const path = url.pathname;
+    const KV   = env.KV;
 
     if (request.method === 'OPTIONS') {
       return new Response(null, { headers: CORS });
     }
 
-    // API: Partidos
+    // ---- KV: Leer campo específico ----
+    if (path.startsWith('/api/kv/') && request.method === 'GET') {
+      const key = path.replace('/api/kv/', '');
+      try {
+        const val = await kvGet(KV, key);
+        return new Response(JSON.stringify({ key, value: val }), { headers: CORS });
+      } catch(e) {
+        return new Response(JSON.stringify({ error: e.message }), { headers: CORS, status: 500 });
+      }
+    }
+
+    // ---- KV: Escribir campo específico ----
+    if (path.startsWith('/api/kv/') && request.method === 'POST') {
+      const key = path.replace('/api/kv/', '');
+      try {
+        const body = await request.json();
+        await kvSet(KV, key, body.value);
+        return new Response(JSON.stringify({ ok: true }), { headers: CORS });
+      } catch(e) {
+        return new Response(JSON.stringify({ error: e.message }), { headers: CORS, status: 500 });
+      }
+    }
+
+    // ---- KV: Leer todos los datos ----
+    if (path === '/api/db' && request.method === 'GET') {
+      try {
+        const [participantes, predicciones, premios, retos, chat, presencia] = await Promise.all([
+          kvGet(KV, 'participantes'),
+          kvGet(KV, 'predicciones'),
+          kvGet(KV, 'premios'),
+          kvGet(KV, 'retos'),
+          kvGet(KV, 'chat'),
+          kvGet(KV, 'presencia'),
+        ]);
+        // Partidos siguen en JSONBin
+        let partidos = [], partidosFetchedAt = null;
+        try {
+          const jbRes = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, {
+            headers: { 'X-Master-Key': JSONBIN_KEY, 'X-Bin-Meta': 'false' }
+          });
+          const jbData = await jbRes.json();
+          partidos = jbData.partidos || [];
+          partidosFetchedAt = jbData.partidosFetchedAt || null;
+        } catch(e) { console.error('JSONBin read error:', e.message); }
+
+        return new Response(JSON.stringify({
+          participantes: participantes || [],
+          predicciones:  predicciones  || [],
+          premios:       premios       || [],
+          retos:         retos         || [],
+          chat:          chat          || [],
+          presencia:     presencia     || [],
+          partidos,
+          partidosFetchedAt,
+        }), { headers: CORS });
+      } catch(e) {
+        return new Response(JSON.stringify({ error: e.message }), { headers: CORS, status: 500 });
+      }
+    }
+
+    // ---- KV: Guardar campos específicos ----
+    if (path === '/api/db' && request.method === 'POST') {
+      try {
+        const body = await request.json();
+        const writes = [];
+
+        // PROTECCIÓN TOTAL: nunca sobreescribir con arrays más pequeños
+        const protectedFields = ['participantes','predicciones','premios','retos','presencia','chat'];
+        for(const field of protectedFields) {
+          if(body[field] !== undefined) {
+            const actual = await kvGet(KV, field);
+            const incoming = body[field];
+            // Para chat: nunca borrar mensajes existentes
+            if(field === 'chat') {
+              if(!actual || actual.length === 0) {
+                // KV vacío — escribir lo que venga
+                if(incoming.length > 0) writes.push(kvSet(KV, field, incoming));
+              } else if(incoming.length > 0) {
+                // Merge: combinar mensajes del KV con los nuevos
+                const existingIds = new Set(actual.map(m=>m.id));
+                const merged = [...actual];
+                incoming.forEach(m => { if(!existingIds.has(m.id)) merged.push(m); });
+                // Si hay borrados intencionales (menos mensajes), respetar solo si viene del admin
+                const isDelete = incoming.length < actual.length;
+                writes.push(kvSet(KV, field, isDelete ? incoming : merged.slice(-20)));
+              }
+              // Si viene vacío y KV tiene mensajes: NO escribir nada
+            } else {
+              // Para otros campos: escribir si viene con datos o si KV está vacío
+              if(!actual || actual.length === 0 || incoming.length >= actual.length) {
+                writes.push(kvSet(KV, field, incoming));
+              } else if(incoming.length > 0) {
+                writes.push(kvSet(KV, field, incoming));
+              }
+            }
+          }
+        }
+        // Partidos van a JSONBin si vienen
+        if(body.partidos !== undefined || body.partidosFetchedAt !== undefined) {
+          writes.push((async () => {
+            const jbRes = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, {
+              headers: { 'X-Master-Key': JSONBIN_KEY, 'X-Bin-Meta': 'false' }
+            });
+            const jbData = await jbRes.json();
+            if(body.partidos) jbData.partidos = body.partidos;
+            if(body.partidosFetchedAt) jbData.partidosFetchedAt = body.partidosFetchedAt;
+            await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_KEY },
+              body: JSON.stringify(jbData)
+            });
+          })());
+        }
+        await Promise.all(writes);
+        return new Response(JSON.stringify({ ok: true }), { headers: CORS });
+      } catch(e) {
+        return new Response(JSON.stringify({ error: e.message }), { headers: CORS, status: 500 });
+      }
+    }
+
+    // ---- CHAT: endpoint dedicado — key separada en KV ----
+    if (path === '/api/chat') {
+      if (request.method === 'GET') {
+        const chat = await kvGet(KV, 'chat_mensajes') || [];
+        return new Response(JSON.stringify({ chat }), { headers: CORS });
+      }
+      if (request.method === 'POST') {
+        const body = await request.json();
+        let chat = await kvGet(KV, 'chat_mensajes') || [];
+        if(body.accion === 'agregar' && body.mensaje) {
+          // Solo agregar si no existe ya
+          if(!chat.find(m=>m.id===body.mensaje.id)) {
+            chat = [...chat, body.mensaje].slice(-20);
+            await kvSet(KV, 'chat_mensajes', chat);
+          }
+        } else if(body.accion === 'borrar' && body.id) {
+          chat = chat.filter(m=>m.id!==body.id);
+          await kvSet(KV, 'chat_mensajes', chat);
+        }
+        return new Response(JSON.stringify({ chat }), { headers: CORS });
+      }
+    }
+
+    // ---- CHAT: endpoint dedicado ----
+    if (path === '/api/chat') {
+      if (request.method === 'GET') {
+        const chat = await kvGet(KV, 'chat_mensajes') || [];
+        return new Response(JSON.stringify({ chat }), { headers: CORS });
+      }
+      if (request.method === 'POST') {
+        const body = await request.json();
+        let chat = await kvGet(KV, 'chat_mensajes') || [];
+        if(body.accion === 'agregar' && body.mensaje) {
+          if(!chat.find(m=>m.id===body.mensaje.id)) {
+            chat = [...chat, body.mensaje].slice(-20);
+            await kvSet(KV, 'chat_mensajes', chat);
+          }
+        } else if(body.accion === 'borrar' && body.id) {
+          chat = chat.filter(m=>m.id!==body.id);
+          await kvSet(KV, 'chat_mensajes', chat);
+        }
+        return new Response(JSON.stringify({ chat }), { headers: CORS });
+      }
+    }
+
+    // ---- API: Partidos ----
     if (path === '/api/partidos') {
       try {
-        const res  = await fetch(`${FOOTBALL_BASE}/competitions/WC/matches?season=2026`, {
+        const res = await fetch(`${FOOTBALL_BASE}/competitions/WC/matches?season=2026`, {
           headers: { 'X-Auth-Token': FOOTBALL_KEY }
         });
         const data = await res.json();
-        return new Response(JSON.stringify({ partidos: (data.matches||[]).map(normPartido) }), {
+        const partidos = (data.matches||[]).map(normPartido);
+        // Guardar en JSONBin
+        const jbRes = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, {
+          headers: { 'X-Master-Key': JSONBIN_KEY, 'X-Bin-Meta': 'false' }
+        });
+        const jbData = await jbRes.json();
+        jbData.partidos = partidos;
+        jbData.partidosFetchedAt = new Date().toISOString();
+        await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_KEY },
+          body: JSON.stringify(jbData)
+        });
+        return new Response(JSON.stringify({ partidos }), {
           headers: { ...CORS, 'Cache-Control': 'public, max-age=60' }
         });
       } catch(e) {
@@ -54,10 +250,10 @@ export default {
       }
     }
 
-    // API: Standings
+    // ---- API: Standings ----
     if (path === '/api/standings') {
       try {
-        const res  = await fetch(`${FOOTBALL_BASE}/competitions/WC/standings?season=2026`, {
+        const res = await fetch(`${FOOTBALL_BASE}/competitions/WC/standings?season=2026`, {
           headers: { 'X-Auth-Token': FOOTBALL_KEY }
         });
         const data = await res.json();
@@ -69,10 +265,10 @@ export default {
       }
     }
 
-    // API: Goleadores
+    // ---- API: Goleadores ----
     if (path === '/api/scorers') {
       try {
-        const res  = await fetch(`${FOOTBALL_BASE}/competitions/WC/scorers?season=2026&limit=10`, {
+        const res = await fetch(`${FOOTBALL_BASE}/competitions/WC/scorers?season=2026&limit=10`, {
           headers: { 'X-Auth-Token': FOOTBALL_KEY }
         });
         const data = await res.json();
@@ -84,17 +280,14 @@ export default {
       }
     }
 
-    // API: Noticias via Google News RSS
+    // ---- API: Noticias via Google News RSS ----
     if (path === '/api/noticias') {
       try {
-        // Google News RSS - noticias del Mundial en español de todos los países
         const rssUrl = 'https://news.google.com/rss/search?q=Mundial+2026+OR+Copa+del+Mundo+2026+OR+FIFA+2026+OR+gol+Mundial+OR+partido+Mundial+OR+seleccion+Mundial+OR+resultado+Copa+OR+clasificacion+Mundial+OR+goleador+Mundial+OR+arbitro+Mundial+OR+cancha+Mundial+OR+estadio+Copa+OR+entrenador+Copa+OR+jugador+Mundial+OR+penalti+Copa+OR+eliminacion+Mundial+OR+octavos+Copa+OR+cuartos+Copa+OR+semifinal+Copa+OR+final+Mundial&hl=es-419&gl=US&ceid=US:es-419';
         const res = await fetch(rssUrl, {
           headers: { 'User-Agent': 'Mozilla/5.0 (compatible; QuinielaNavo/1.0)' }
         });
         const xml = await res.text();
-        
-        // Parse RSS XML manually
         const items = [];
         const itemMatches = xml.matchAll(/<item>([\s\S]*?)<\/item>/g);
         for (const match of itemMatches) {
@@ -107,7 +300,6 @@ export default {
           if(title && link) items.push({ title, url: link, publishedAt: pubDate, source: { name: source }, urlToImage: thumb });
           if(items.length >= 20) break;
         }
-        // Ordenar por fecha más reciente y filtrar últimas 24 horas
         items.sort((a,b) => {
           const da = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
           const db2 = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
@@ -117,50 +309,19 @@ export default {
         const recientes = items.filter(i => i.publishedAt && new Date(i.publishedAt).getTime() > hace24h);
         const final = recientes.length >= 5 ? recientes.slice(0,10) : items.slice(0,10);
         return new Response(JSON.stringify({ articles: final }), {
-          headers: { ...CORS, 'Cache-Control': 'public, max-age=900' }
+          headers: { ...CORS, 'Cache-Control': 'public, max-age=300' }
         });
       } catch(e) {
         return new Response(JSON.stringify({ articles: [], error: e.message }), { headers: CORS });
       }
     }
 
-    // ---- PROXY: DB Read (GET /api/db) ----
-    if (path === '/api/db' && request.method === 'GET') {
-      try {
-        const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, {
-          headers: { 'X-Master-Key': JSONBIN_KEY, 'X-Bin-Meta': 'false' }
-        });
-        const data = await res.json();
-        return new Response(JSON.stringify(data), {
-          headers: { ...CORS, 'Content-Type': 'application/json' }
-        });
-      } catch(e) {
-        return new Response(JSON.stringify({ error: e.message }), { headers: CORS, status: 500 });
-      }
-    }
-
-    // ---- PROXY: DB Write (POST /api/db) ----
-    if (path === '/api/db' && request.method === 'POST') {
-      try {
-        const body = await request.json();
-        const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_KEY },
-          body: JSON.stringify(body)
-        });
-        const data = await res.json();
-        return new Response(JSON.stringify({ ok: true }), { headers: CORS });
-      } catch(e) {
-        return new Response(JSON.stringify({ error: e.message }), { headers: CORS, status: 500 });
-      }
-    }
-
-    // Servir index.html desde GitHub
+    // ---- Servir index.html desde GitHub ----
     try {
-      const res = await fetch(HTML_URL, { cf: { cacheEverything: true, cacheTtl: 300 } });
+      const res = await fetch(HTML_URL);
       const html = await res.text();
       return new Response(html, {
-        headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=300' }
+        headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, no-store, must-revalidate' }
       });
     } catch(e) {
       return new Response('Error: ' + e.message, { status: 500 });
