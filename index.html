@@ -325,7 +325,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v3.4</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v3.5</p>
 </header>
 
 <div class="topbar">
@@ -868,10 +868,11 @@ function renderRetoPrincipal() {
   const correcto = reto.resultado;
 
   // Countdown
+  const _now = Date.now();
   let countdownHtml = '';
   if(isPre&&partido.fecha&&partido.hora) {
     const inicio = new Date(partido.fecha+'T'+partido.hora+':00Z');
-    const diff = inicio-ahora;
+    const diff = inicio-_now;
     if(diff>0) {
       const h = Math.floor(diff/3600000);
       const m = Math.floor((diff%3600000)/60000);
