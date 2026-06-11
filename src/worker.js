@@ -19,6 +19,47 @@ async function kvSet(kv, key, value) {
   await kv.put(key, JSON.stringify(value));
 }
 
+// Mapa de IDs worldcup26.ir → IDs football-data.org
+const ID_MAP = {
+  '1':'537327','2':'537328','3':'537333','4':'537345','5':'537334','6':'537339',
+  '7':'537340','8':'537346','9':'537351','10':'537357','11':'537352','12':'537358',
+  '13':'537369','14':'537363','15':'537370','16':'537364','17':'537391','18':'537392',
+  '19':'537397','20':'537398','21':'537403','22':'537409','23':'537410','24':'537404',
+  '25':'537329','26':'537335','27':'537336','28':'537330','29':'537348','30':'537342',
+  '31':'537341','32':'537347','33':'537359','34':'537353','35':'537354','36':'537360',
+  '37':'537371','38':'537365','39':'537372','40':'537366','41':'537399','42':'537393',
+  '43':'537394','44':'537400','45':'537405','46':'537411','47':'537412','48':'537406',
+  '49':'537337','50':'537338','51':'537344','52':'537343','53':'537331','54':'537332',
+  '55':'537355','56':'537356','57':'537361','58':'537362','59':'537349','60':'537350',
+  '61':'537373','62':'537367','63':'537374','64':'537368','65':'537395','66':'537401',
+  '67':'537402','68':'537396','69':'537407','70':'537413','71':'537414','72':'537408',
+};
+
+// Mapa de nombres de equipos → códigos TLA y banderas
+const TEAM_MAP = {
+  'Mexico':{'tla':'MEX'},'South Africa':{'tla':'RSA'},'South Korea':{'tla':'KOR'},
+  'Czech Republic':{'tla':'CZE'},'Canada':{'tla':'CAN'},'Bosnia and Herzegovina':{'tla':'BIH'},
+  'United States':{'tla':'USA'},'Paraguay':{'tla':'PAR'},'Qatar':{'tla':'QAT'},
+  'Switzerland':{'tla':'SUI'},'Brazil':{'tla':'BRA'},'Morocco':{'tla':'MAR'},
+  'Haiti':{'tla':'HTI'},'Scotland':{'tla':'SCO'},'Australia':{'tla':'AUS'},
+  'Turkey':{'tla':'TUR'},'Germany':{'tla':'GER'},'Curaçao':{'tla':'CUW'},
+  'Netherlands':{'tla':'NED'},'Japan':{'tla':'JAP'},"Côte d'Ivoire":{'tla':'CIV'},
+  'Ecuador':{'tla':'ECU'},'Argentina':{'tla':'ARG'},'Spain':{'tla':'ESP'},
+  'France':{'tla':'FRA'},'England':{'tla':'ENG'},'Portugal':{'tla':'POR'},
+  'Uruguay':{'tla':'URU'},'Colombia':{'tla':'COL'},'Chile':{'tla':'CHI'},
+  'Peru':{'tla':'PER'},'Venezuela':{'tla':'VEN'},'Panama':{'tla':'PAN'},
+  'Costa Rica':{'tla':'CRC'},'Honduras':{'tla':'HON'},'Jamaica':{'tla':'JAM'},
+  'Serbia':{'tla':'SRB'},'Croatia':{'tla':'CRO'},'Poland':{'tla':'POL'},
+  'Belgium':{'tla':'BEL'},'Denmark':{'tla':'DEN'},'Ukraine':{'tla':'UKR'},
+  'Austria':{'tla':'AUT'},'Hungary':{'tla':'HUN'},'Romania':{'tla':'ROM'},
+  'Saudi Arabia':{'tla':'SAU'},'Iran':{'tla':'IRN'},'Jordan':{'tla':'JOR'},
+  'Iraq':{'tla':'IRQ'},'Uzbekistan':{'tla':'UZB'},'South Korea':{'tla':'KOR'},
+  'Nigeria':{'tla':'NGA'},'Ghana':{'tla':'GHA'},'Senegal':{'tla':'SEN'},
+  'Egypt':{'tla':'EGY'},'Algeria':{'tla':'ALG'},'Cameroon':{'tla':'CMR'},
+  'Tunisia':{'tla':'TUN'},'New Zealand':{'tla':'NZL'},'Slovenia':{'tla':'SLO'},
+  'Slovakia':{'tla':'SVK'},'Czech Republic':{'tla':'CZE'},
+};
+
 function normPartido(m) {
   const ft = (m.score||{}).fullTime||{};
   const fases = {GROUP_STAGE:'Fase de Grupos',ROUND_OF_32:'Round of 32',ROUND_OF_16:'Octavos de Final',QUARTER_FINALS:'Cuartos de Final',SEMI_FINALS:'Semifinal',THIRD_PLACE:'Tercer Lugar',FINAL:'Final'};
@@ -114,26 +155,31 @@ export default {
             let status = 'PRE';
             if(finished) status = 'FT';
             else if(live) status = 'LIVE';
-            // Parse fecha/hora
             const dateStr = g.local_date || '';
             const [datePart, timePart] = dateStr.split(' ');
             const [month, day, year] = (datePart||'').split('/');
             const fecha = year && month && day ? `${year}-${month.padStart(2,'0')}-${day.padStart(2,'0')}` : '';
+            const localNom = g.home_team_name_en || 'TBD';
+            const visNom = g.away_team_name_en || 'TBD';
+            const localInfo = TEAM_MAP[localNom] || {};
+            const visInfo = TEAM_MAP[visNom] || {};
+            // Usar ID mapeado para compatibilidad con predicciones existentes
+            const mappedId = ID_MAP[String(g.id)] || String(g.id);
             return {
-              id: String(g.id),
-              local: g.home_team_name_en || 'TBD',
-              visitante: g.away_team_name_en || 'TBD',
-              localCod: '',
-              visitanteCod: '',
+              id: mappedId,
+              local: localNom,
+              visitante: visNom,
+              localCod: localInfo.tla || '',
+              visitanteCod: visInfo.tla || '',
               fecha,
               hora: timePart || '',
               fase: g.type === 'group' ? 'Fase de Grupos' : 'Eliminatorias',
               grupo: g.group ? 'Grupo ' + g.group : '',
               estadio: '',
               status,
-              g1: g.home_score !== null && g.home_score !== undefined ? parseInt(g.home_score) : null,
-              g2: g.away_score !== null && g.away_score !== undefined ? parseInt(g.away_score) : null,
-              minuto: g.time_elapsed && g.time_elapsed !== 'live' && g.time_elapsed !== 'notstarted' ? g.time_elapsed : null,
+              g1: (status === 'LIVE' || status === 'FT') && g.home_score !== null ? parseInt(g.home_score) : null,
+              g2: (status === 'LIVE' || status === 'FT') && g.away_score !== null ? parseInt(g.away_score) : null,
+              minuto: null,
             };
           });
           const partidosFetchedAt = new Date().toISOString();
