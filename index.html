@@ -325,7 +325,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v2.6</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v2.8</p>
 </header>
 
 <div class="topbar">
@@ -439,9 +439,6 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 // =============================================
 // CONFIG
 // =============================================
-const JSONBIN_ID  = '6a28287ff5f4af5e29d268c7';
-const JSONBIN_KEY = '$2a$10$RpBaOrEN5kbNEXni5oWSvOTJjNCel.lsGSo1s7cqZMYQQcDcLVLQm';
-const JSONBIN_URL = 'https://api.jsonbin.io/v3/b/' + JSONBIN_ID;
 const FOOTBALL_KEY = '9ffbbd9890b24d43a0c2d5667a0bfbd9';
 const FOOTBALL_URL = 'https://api.football-data.org/v4/competitions/WC/matches?season=2026';
 const PIN_ADMIN_DEFAULT = '1234';
@@ -556,7 +553,7 @@ function aplicarRol() {
 }
 
 // =============================================
-// JSONBIN — DB
+// DB via Cloudflare KV
 // =============================================
 async function dbRead() {
   const res = await fetch('/api/db');
@@ -644,18 +641,13 @@ async function actualizarPartidosSiNecesario() {
   if((ahora - ultimoFetch) < intervalo) return;
 
   try {
-    // Llamar al Worker como proxy — sin CORS
+    // /api/partidos actualiza KV directamente en el Worker
     const res = await fetch('/api/partidos');
     if(!res.ok) throw new Error('Partidos API: '+res.status);
     const data = await res.json();
     db.partidos = data.partidos || db.partidos;
     db.partidosFetchedAt = new Date().toISOString();
-    // Solo actualizar partidos — NO tocar chat, predicciones ni otros campos
-    const fresco = await dbRead();
-    fresco.partidos = db.partidos;
-    fresco.partidosFetchedAt = db.partidosFetchedAt;
-    await dbWrite(fresco);
-    db.chat = fresco.chat || db.chat; // actualizar chat local con el del servidor
+    // No llamar dbWrite — el Worker ya guardó los partidos en KV
   } catch(e) { console.error('Football API error:', e.message); }
 }
 
