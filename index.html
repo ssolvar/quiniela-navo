@@ -1691,7 +1691,10 @@ function renderStandings() {
     c.innerHTML = '<div class="empty" style="color:rgba(255,255,255,.5)">Los standings aparecerán cuando empiece el torneo</div>';
     return;
   }
-  c.innerHTML = standings.map(grp => {
+  // Solo mostrar tipo TOTAL, no HOME ni AWAY
+  const soloTotal = standings.filter(grp => grp.type === 'TOTAL');
+  const grupos = soloTotal.length ? soloTotal : standings;
+  c.innerHTML = grupos.map(grp => {
     const grupoNom = grp.group || 'Grupo';
     const tabla = grp.table || [];
     const rows = tabla.map((t,i) => {
