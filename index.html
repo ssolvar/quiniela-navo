@@ -325,7 +325,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v1.8</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v1.9</p>
 </header>
 
 <div class="topbar">
@@ -795,7 +795,12 @@ function asignarRetosAutomaticos() {
       }
     }
   });
-  if(cambio) dbWrite(db).catch(e=>console.error('Error saving retos:',e));
+  if(cambio) {
+    dbRead().then(fresco => {
+      fresco.retos = db.retos;
+      dbWrite(fresco).catch(e=>console.error('Error saving retos:',e));
+    }).catch(e=>console.error('Error reading before saving retos:',e));
+  }
 }
 
 function calcularPuntosRetos() {
@@ -815,7 +820,12 @@ function calcularPuntosRetos() {
     });
     cambio = true;
   });
-  if(cambio) dbWrite(db).catch(e=>console.error('Error saving reto puntos:',e));
+  if(cambio) {
+    dbRead().then(fresco => {
+      fresco.retos = db.retos;
+      dbWrite(fresco).catch(e=>console.error('Error saving reto puntos:',e));
+    }).catch(e=>console.error('Error reading before saving reto puntos:',e));
+  }
 }
 
 function getRetoPartido(partidoId) {
