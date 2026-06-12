@@ -325,7 +325,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v3.9</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v4.0</p>
 </header>
 
 <div class="topbar">
@@ -968,13 +968,7 @@ function renderTabla() {
         <td><span class="bpt">${pts[p.id]||0}</span></td></tr>`;
     }).join('')}</tbody></table>`;
 
-  const sc=document.getElementById('stats-cont');
-  const maxP=Math.max(...ranking.map(p=>pts[p.id]||0),1);
-  sc.innerHTML=ranking.map(p=>`<div class="stat-row">
-    ${avatarHtml(p)}<span class="stat-nom">${p.nombre}</span>
-    <div class="stat-bar-wrap"><div class="stat-bar" style="width:${Math.round(((pts[p.id]||0)/maxP)*100)}%"></div></div>
-    <span class="stat-pts">${pts[p.id]||0}</span>
-  </div>`).join('');
+  // stats-cont fue removido — no renderizar barras
 }
 
 // =============================================
