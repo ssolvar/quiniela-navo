@@ -239,7 +239,14 @@ export default {
             const st = comp.status?.type;
             let status = 'PRE';
             if(st?.completed) status = 'FT';
+            else if(st?.name === 'STATUS_HALFTIME') status = 'HT';
             else if(st?.state === 'in') status = 'LIVE';
+            
+            // Tarjetas rojas
+            const details = comp.details || [];
+            const tarjetas = details.filter(d => d.type?.text === 'Red Card' || d.type?.text === 'Yellow-Red Card');
+            const rojasLocal = tarjetas.filter(d => d.team?.id === home?.team?.id).length;
+            const rojasVisita = tarjetas.filter(d => d.team?.id === away?.team?.id).length;
             const dt = new Date(ev.date);
             const fecha = dt.toISOString().slice(0,10);
             const hora = dt.toISOString().slice(11,16);
@@ -258,7 +265,9 @@ export default {
               status,
               g1: status !== 'PRE' ? parseInt(home?.score||0) : null,
               g2: status !== 'PRE' ? parseInt(away?.score||0) : null,
-              minuto: st?.state === 'in' ? comp.status?.displayClock : null,
+              minuto: (status === 'LIVE' || status === 'HT') ? comp.status?.displayClock : null,
+              rojasLocal,
+              rojasVisita,
             };
           }).filter(Boolean);
 
