@@ -251,7 +251,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 /* CHAT */
 .chat-wrap{background:#0d1440;border-radius:14px;padding:14px 15px;margin-bottom:10px;box-shadow:0 4px 20px rgba(0,0,0,.4);border:1px solid #1a2a70}
 .chat-title{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;color:var(--do);margin-bottom:10px;display:flex;align-items:center;gap:6px}
-.chat-msgs{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;min-height:40px}
+.chat-msgs{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;min-height:40px;max-height:260px;overflow-y:auto;scroll-behavior:smooth}
 .chat-msg{display:flex;align-items:flex-start;gap:8px}
 .chat-msg-body{background:#141e5c;border-radius:10px;padding:7px 10px;flex:1}
 .chat-msg-name{font-size:11px;font-weight:700;color:var(--do);margin-bottom:2px}
@@ -269,7 +269,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 /* CHAT */
 .chat-wrap{background:#0d1440;border-radius:14px;padding:14px 15px;margin-bottom:10px;box-shadow:0 4px 20px rgba(0,0,0,.4);border:1px solid #1a2a70}
 .chat-title{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;color:var(--do);margin-bottom:10px;display:flex;align-items:center;gap:6px}
-.chat-msgs{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;min-height:40px}
+.chat-msgs{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;min-height:40px;max-height:260px;overflow-y:auto;scroll-behavior:smooth}
 .chat-msg{display:flex;align-items:flex-start;gap:8px}
 .chat-msg-body{background:#141e5c;border-radius:10px;padding:7px 10px;flex:1}
 .chat-msg-name{font-size:11px;font-weight:700;color:var(--do);margin-bottom:2px}
@@ -325,7 +325,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v4.3</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v4.4</p>
 </header>
 
 <div class="topbar">
@@ -1928,7 +1928,7 @@ function renderChat() {
     return;
   }
 
-  msgs.innerHTML = chat.slice(-10).reverse().map(m => {
+  msgs.innerHTML = chat.slice(-15).reverse().map(m => {
     const esMio = m.uid === currentUserId || (m.uid==='admin' && currentRole==='admin');
     const part = db.participantes.find(p=>p.id===m.uid);
     const nombre = m.uid==='admin' ? '⚡ Admin' : (part?part.nombre:'?');
