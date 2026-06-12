@@ -325,7 +325,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v4.0</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v4.1</p>
 </header>
 
 <div class="topbar">
@@ -1684,7 +1684,7 @@ function renderGoleadores() {
         <strong>${s.player?.name||'?'}</strong>
         <span>${banderas(equipoCod)} ${equipo}</span>
       </div>
-      <span class="goleador-goles">${s.goals||s.numberOfGoals||0} ⚽</span>
+      <span class="goleador-goles" style="color:#c9a227">${s.goals||s.numberOfGoals||0} ⚽</span>
     </div>`;
   }).join('') + '</div>';
 }
