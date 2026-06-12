@@ -158,7 +158,14 @@ export default {
             const dateStr = g.local_date || '';
             const [datePart, timePart] = dateStr.split(' ');
             const [month, day, year] = (datePart||'').split('/');
-            const fecha = year && month && day ? `${year}-${month.padStart(2,'0')}-${day.padStart(2,'0')}` : '';
+            // worldcup26.ir da hora en CR (UTC-6), convertir a UTC para formatFecha
+            let fecha = year && month && day ? `${year}-${month.padStart(2,'0')}-${day.padStart(2,'0')}` : '';
+            let horaUTC = timePart || '';
+            if(timePart && fecha) {
+              const dt = new Date(`${fecha}T${timePart}:00-06:00`); // CR es UTC-6
+              fecha = dt.toISOString().slice(0,10);
+              horaUTC = dt.toISOString().slice(11,16);
+            }
             const localNom = g.home_team_name_en || 'TBD';
             const visNom = g.away_team_name_en || 'TBD';
             const localInfo = TEAM_MAP[localNom] || {};
@@ -172,7 +179,7 @@ export default {
               localCod: localInfo.tla || '',
               visitanteCod: visInfo.tla || '',
               fecha,
-              hora: timePart || '',
+              hora: horaUTC || '',
               fase: g.type === 'group' ? 'Fase de Grupos' : 'Eliminatorias',
               grupo: g.group ? 'Grupo ' + g.group : '',
               estadio: '',
