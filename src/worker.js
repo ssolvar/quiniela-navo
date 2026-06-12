@@ -35,6 +35,9 @@ const ESPN_ID_MAP = {
   '760459':'537405','760460':'537411','760461':'537412','760462':'537406',
 };
 
+// Mapa de IDs ESPN → IDs football-data.org
+
+
 // Mapa de IDs worldcup26.ir → IDs football-data.org (legacy)
 const ID_MAP = {
   '1':'537327','2':'537328','3':'537333','4':'537345','5':'537334','6':'537339',
@@ -160,60 +163,71 @@ export default {
     // ==========================================
     if (path === '/api/partidos') {
       try {
-        // Usar worldcup26.ir — gratis, sin key, datos en vivo
-        const res = await fetch('https://worldcup26.ir/get/games');
+        // ESPN API — solo partidos de hoy para scores en vivo
+        const res = await fetch('https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard');
         const data = await res.json();
-        const games = data.games || data;
-        if(games && games.length > 0) {
-          const partidos = games.map(g => {
-            const finished = g.finished === 'TRUE' || g.finished === true;
-            const live = g.time_elapsed === 'live' || (g.time_elapsed && g.time_elapsed !== 'notstarted' && !finished);
+        const events = data.events || [];
+        
+        // Leer partidos existentes del KV
+        let partidosKV = await kvGet(KV, 'partidos') || [];
+        
+        if(events.length > 0) {
+          // Actualizar solo los partidos de hoy con datos de ESPN
+          const espnPartidos = events.map(ev => {
+            const comp = ev.competitions?.[0];
+            if(!comp) return null;
+            const home = comp.competitors?.find(c=>c.homeAway==='home');
+            const away = comp.competitors?.find(c=>c.homeAway==='away');
+            const st = comp.status?.type;
             let status = 'PRE';
-            if(finished) status = 'FT';
-            else if(live) status = 'LIVE';
-            const dateStr = g.local_date || '';
-            const [datePart, timePart] = dateStr.split(' ');
-            const [month, day, year] = (datePart||'').split('/');
-            // worldcup26.ir da hora en CR (UTC-6), convertir a UTC para formatFecha
-            let fecha = year && month && day ? `${year}-${month.padStart(2,'0')}-${day.padStart(2,'0')}` : '';
-            let horaUTC = timePart || '';
-            if(timePart && fecha) {
-              const dt = new Date(`${fecha}T${timePart}:00-06:00`); // CR es UTC-6
-              fecha = dt.toISOString().slice(0,10);
-              horaUTC = dt.toISOString().slice(11,16);
-            }
-            const localNom = g.home_team_name_en || 'TBD';
-            const visNom = g.away_team_name_en || 'TBD';
-            const localInfo = TEAM_MAP[localNom] || {};
-            const visInfo = TEAM_MAP[visNom] || {};
-            // Usar ID mapeado para compatibilidad con predicciones existentes
-            const mappedId = ID_MAP[String(g.id)] || String(g.id);
+            if(st?.completed) status = 'FT';
+            else if(st?.state === 'in') status = 'LIVE';
+            const dt = new Date(ev.date);
+            const fecha = dt.toISOString().slice(0,10);
+            const hora = dt.toISOString().slice(11,16);
+            const espnId = ev.id;
+            const mappedId = ESPN_ID_MAP[espnId] || espnId;
             return {
               id: mappedId,
-              local: localNom,
-              visitante: visNom,
-              localCod: localInfo.tla || '',
-              visitanteCod: visInfo.tla || '',
-              fecha,
-              hora: horaUTC || '',
-              fase: g.type === 'group' ? 'Fase de Grupos' : 'Eliminatorias',
-              grupo: g.group ? 'Grupo ' + g.group : '',
-              estadio: '',
+              local: home?.team?.displayName || 'TBD',
+              visitante: away?.team?.displayName || 'TBD',
+              localCod: home?.team?.abbreviation || '',
+              visitanteCod: away?.team?.abbreviation || '',
+              fecha, hora,
+              fase: 'Fase de Grupos',
+              grupo: '',
+              estadio: comp.venue?.fullName || '',
               status,
-              g1: (status === 'LIVE' || status === 'FT') && g.home_score !== null ? parseInt(g.home_score) : null,
-              g2: (status === 'LIVE' || status === 'FT') && g.away_score !== null ? parseInt(g.away_score) : null,
-              minuto: null,
+              g1: status !== 'PRE' ? parseInt(home?.score||0) : null,
+              g2: status !== 'PRE' ? parseInt(away?.score||0) : null,
+              minuto: st?.state === 'in' ? comp.status?.displayClock : null,
             };
+          }).filter(Boolean);
+
+          // Merge: actualizar scores de hoy, NUNCA borrar partidos existentes
+          espnPartidos.forEach(ep => {
+            const idx = partidosKV.findIndex(p => p.id === ep.id);
+            if(idx >= 0) {
+              // Solo actualizar status y scores, mantener todo lo demas
+              partidosKV[idx].status = ep.status;
+              partidosKV[idx].g1 = ep.g1;
+              partidosKV[idx].g2 = ep.g2;
+              partidosKV[idx].minuto = ep.minuto;
+            }
+            // NO agregar nuevos — usar solo los partidos del KV
           });
+        }
+
+        // Solo guardar si el KV tiene partidos (no sobreescribir con menos)
+        if(partidosKV.length > 0) {
           const partidosFetchedAt = new Date().toISOString();
           await Promise.all([
-            kvSet(KV, 'partidos', partidos),
+            kvSet(KV, 'partidos', partidosKV),
             kvSet(KV, 'partidosFetchedAt', partidosFetchedAt),
           ]);
-          return new Response(JSON.stringify({ partidos, partidosFetchedAt }), { headers: CORS });
+          return new Response(JSON.stringify({ partidos: partidosKV, partidosFetchedAt }), { headers: CORS });
         }
-        const partidos = await kvGet(KV, 'partidos') || [];
-        return new Response(JSON.stringify({ partidos, fromCache: true }), { headers: CORS });
+        return new Response(JSON.stringify({ partidos: partidosKV, fromCache: true }), { headers: CORS });
       } catch(e) {
         const partidos = await kvGet(KV, 'partidos') || [];
         return new Response(JSON.stringify({ partidos, error: e.message }), { headers: CORS });
