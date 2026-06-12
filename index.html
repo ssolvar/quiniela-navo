@@ -334,7 +334,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v5.0</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v5.1</p>
 </header>
 
 <div class="topbar">
@@ -1029,17 +1029,21 @@ function renderPartidos() {
     const statusLabel=isFT?'FINALIZADO':isHT?'⏸ MEDIO TIEMPO':isLive?`EN VIVO${minLabel}`:formatFecha(p.fecha,p.hora);
     const marcador=isFT||isLive||isHT?`<div class="marcador ${cls}">${p.g1} - ${p.g2}</div>`:`<div class="marcador pre">vs</div>`;
     
-    // Tarjetas — mostrar número en vez de repetir emoji
-    const amL = (p.amarillasLocal||0) > 0 ? `<span style="font-size:9px">🟨${p.amarillasLocal}</span>` : '';
-    const amV = (p.amarillasVisita||0) > 0 ? `<span style="font-size:9px">🟨${p.amarillasVisita}</span>` : '';
-    const rjL = (p.rojasLocal||0) > 0 ? `<span style="font-size:9px">🟥${p.rojasLocal}</span>` : '';
-    const rjV = (p.rojasVisita||0) > 0 ? `<span style="font-size:9px">🟥${p.rojasVisita}</span>` : '';
+    // Tarjetas
+    const tarjetasHtml = (() => {
+      const amL = (p.amarillasLocal||0) > 0 ? `🟨${p.amarillasLocal}` : '';
+      const rjL = (p.rojasLocal||0) > 0 ? `🟥${p.rojasLocal}` : '';
+      const amV = (p.amarillasVisita||0) > 0 ? `🟨${p.amarillasVisita}` : '';
+      const rjV = (p.rojasVisita||0) > 0 ? `🟥${p.rojasVisita}` : '';
+      const hayTarjetas = amL||rjL||amV||rjV;
+      if(!hayTarjetas) return '';
+      return `<div class="tarjetas-row"><span>${amL}${rjL}</span><span>${amV}${rjV}</span></div>`;
+    })();
     
-    // Goles — detectar por posición en partido si no hay homeId
+    // Goles
     const goles = p.goles || [];
-    // Intentar detectar local por nombre del equipo en el jugador
-    const golesL = goles.filter(g=>g.local).map(g=>`⚽ ${g.jugador} ${g.minuto}`).join('<br>');
-    const golesV = goles.filter(g=>!g.local).map(g=>`${g.minuto} ${g.jugador} ⚽`).join('<br>');
+    const golesL = goles.filter(g=>g.local).map(g=>`${g.jugador} ${g.minuto}`).join(' · ');
+    const golesV = goles.filter(g=>!g.local).map(g=>`${g.minuto} ${g.jugador}`).join(' · ');
     const golesHtml = (golesL||golesV) ? `<div class="goles-wrap"><div class="goles-col">${golesL}</div><div class="goles-col" style="text-align:right">${golesV}</div></div>` : '';
     
     const reto=getRetoPartido(p.id);
@@ -1048,11 +1052,12 @@ function renderPartidos() {
       <div class="ph"><span class="pfase">${p.grupo||p.fase}</span><span class="pstatus ${cls}">${statusLabel}</span></div>
       <div class="equipos">
         <span class="flag">${banderas(p.localCod)}</span>
-        <span class="enombre right">${p.local} ${amL}${rjL}</span>
+        <span class="enombre right">${p.local}</span>
         ${marcador}
-        <span class="enombre">${amV}${rjV} ${p.visitante}</span>
+        <span class="enombre">${p.visitante}</span>
         <span class="flag">${banderas(p.visitanteCod)}</span>
       </div>
+      ${tarjetasHtml}
       ${golesHtml}
       ${retoHtml}
       ${p.estadio?`<div style="font-size:10px;color:#bbb;margin-top:4px;text-align:center">${p.estadio}</div>`:''}
