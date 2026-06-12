@@ -325,7 +325,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v4.4</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v4.5</p>
 </header>
 
 <div class="topbar">
@@ -646,7 +646,25 @@ async function actualizarPartidosSiNecesario() {
   const ahora = Date.now();
   const ultimoFetch = db.partidosFetchedAt ? new Date(db.partidosFetchedAt).getTime() : 0;
   const hayLive = db.partidos.some(p=>p.status==='LIVE'||p.status==='HT');
-  const intervalo = hayLive ? 2*60*1000 : 60*60*1000;
+  
+  // Verificar si hay partido programado en las próximas 3 horas o terminado hace menos de 1 hora
+  const hayPartidoProximo = db.partidos.some(p => {
+    if(p.status !== 'PRE') return false;
+    const inicio = new Date(p.fecha+'T'+(p.hora||'00:00')+':00Z').getTime();
+    return (inicio - ahora) <= 3*60*60*1000 && (inicio - ahora) > 0;
+  });
+  const hayPartidoReciente = db.partidos.some(p => {
+    if(p.status !== 'FT') return false;
+    const ultimoFetchMs = new Date(db.partidosFetchedAt||0).getTime();
+    return (ahora - ultimoFetchMs) < 60*60*1000;
+  });
+
+  let intervalo;
+  if(hayLive) intervalo = 2*60*1000;          // partido en vivo: cada 2 min
+  else if(hayPartidoProximo) intervalo = 5*60*1000;  // partido próximo: cada 5 min
+  else if(hayPartidoReciente) intervalo = 5*60*1000; // partido recién terminado: cada 5 min
+  else intervalo = 60*60*1000;                 // sin partido: cada 1 hora
+
   if((ahora - ultimoFetch) < intervalo) return;
 
   try {
