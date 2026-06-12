@@ -162,6 +162,38 @@ export default {
     // ==========================================
     // CHAT — key separada, nunca se mezcla
     // ==========================================
+    // ---- ACTUALIZAR GOLES DE PARTIDOS FT ----
+    if (path === '/api/partidos/goles') {
+      try {
+        let partidosKV = await kvGet(KV, 'partidos') || [];
+        const sinGoles = partidosKV.filter(p => p.status === 'FT' && (!p.goles || p.goles.length === 0) && p.espnId);
+        await Promise.all(sinGoles.map(async p => {
+          try {
+            const sr = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/summary?event=${p.espnId}`);
+            const sd = await sr.json();
+            const evts = sd.keyEvents || [];
+            const idx = partidosKV.findIndex(x => x.id === p.id);
+            if(idx < 0) return;
+            partidosKV[idx].goles = evts
+              .filter(e => e.scoringPlay || (e.shortText && e.shortText.includes('Goal')))
+              .map(g => ({
+                minuto: g.clock?.displayValue || '',
+                jugador: (g.shortText||'').replace(' Goal','').replace(' - Header','').replace(' - Penalty','').trim(),
+                local: String(g.team?.id) === String(p.homeId),
+              }));
+            partidosKV[idx].amarillasLocal = evts.filter(e=>e.shortText?.includes('Yellow Card')&&String(e.team?.id)===String(p.homeId)).length;
+            partidosKV[idx].amarillasVisita = evts.filter(e=>e.shortText?.includes('Yellow Card')&&String(e.team?.id)===String(p.awayId)).length;
+            partidosKV[idx].rojasLocal = evts.filter(e=>e.shortText?.includes('Red Card')&&String(e.team?.id)===String(p.homeId)).length;
+            partidosKV[idx].rojasVisita = evts.filter(e=>e.shortText?.includes('Red Card')&&String(e.team?.id)===String(p.awayId)).length;
+          } catch(e) {}
+        }));
+        await kvSet(KV, 'partidos', partidosKV);
+        return new Response(JSON.stringify({ ok: true, actualizados: sinGoles.length }), { headers: CORS });
+      } catch(e) {
+        return new Response(JSON.stringify({ error: e.message }), { headers: CORS, status: 500 });
+      }
+    }
+
     if (path === '/api/chat') {
       if (request.method === 'GET') {
         const chat = await kvGet(KV, 'CHAT') || [];
