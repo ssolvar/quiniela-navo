@@ -325,7 +325,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v3.7</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v3.8</p>
 </header>
 
 <div class="topbar">
@@ -2043,7 +2043,20 @@ function renderRetosTabla() {
     </th>`;
   }).join('');
 
+  // Calcular aciertos de retos por participante
+  const retosAcertados = {};
+  db.participantes.forEach(part => {
+    let acertados = 0, total = 0;
+    db.retos.forEach(reto => {
+      if(!reto.resultado) return;
+      total++;
+      if(reto.respuestas?.[part.id] === reto.resultado) acertados++;
+    });
+    retosAcertados[part.id] = { acertados, total };
+  });
+
   const rows = db.participantes.map(part => {
+    const stats = retosAcertados[part.id] || { acertados: 0, total: 0 };
     const celdas = partidos.map(p => {
       const reto = getRetoPartido(p.id);
       if(!reto) return '<td style="text-align:center;padding:5px;border-bottom:1px solid #1a2a70"><span style="color:#6677aa">—</span></td>';
@@ -2070,11 +2083,16 @@ function renderRetosTabla() {
       </td>`;
     }).join('');
 
+    const pct = stats.total > 0 ? Math.round((stats.acertados/stats.total)*100) : null;
+    const statsHtml = stats.total > 0 
+      ? `<span style="font-size:10px;color:#c9a227;font-weight:700;margin-left:4px">${stats.acertados}/${stats.total}${pct!==null?' ('+pct+'%)':''}</span>`
+      : '';
     return `<tr>
       <td style="padding:5px 8px;border-bottom:1px solid #1a2a70">
-        <div style="display:flex;align-items:center;gap:6px">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           ${avatarHtml(part)}
           <span style="font-size:12px;font-weight:600;color:#ffffff">${part.nombre}</span>
+          ${statsHtml}
         </div>
       </td>
       ${celdas}
