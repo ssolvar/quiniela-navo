@@ -334,7 +334,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v4.8</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v4.9</p>
 </header>
 
 <div class="topbar">
@@ -1023,21 +1023,36 @@ function renderPartidos() {
   const partidos=db.partidos.filter(p=>p.fase===grupoActivo);
   if(!partidos.length){pc.innerHTML='<div class="loading">Cargando partidos...</div>';return;}
   pc.innerHTML=partidos.map(p=>{
-    const isFT=p.status==='FT', isLive=p.status==='LIVE'||p.status==='HT';
-    const cls=isFT?'ft':isLive?'live':'pre';
-    const statusLabel=isFT?'Finalizado':isLive?`En vivo ${p.minuto?p.minuto+"'":''}`:formatFecha(p.fecha,p.hora);
-    const marcador=isFT||isLive?`<div class="marcador ${cls}">${p.g1} - ${p.g2}</div>`:`<div class="marcador pre">vs</div>`;
+    const isFT=p.status==='FT', isLive=p.status==='LIVE', isHT=p.status==='HT';
+    const cls=isFT?'ft':(isLive||isHT)?'live':'pre';
+    const minLabel = p.minuto ? ` ${p.minuto}` : '';
+    const statusLabel=isFT?'FINALIZADO':isHT?'⏸ MEDIO TIEMPO':isLive?`EN VIVO${minLabel}`:formatFecha(p.fecha,p.hora);
+    const marcador=isFT||isLive||isHT?`<div class="marcador ${cls}">${p.g1} - ${p.g2}</div>`:`<div class="marcador pre">vs</div>`;
+    
+    // Tarjetas
+    const amL = '🟨'.repeat(Math.min(p.amarillasLocal||0, 3));
+    const amV = '🟨'.repeat(Math.min(p.amarillasVisita||0, 3));
+    const rjL = '🟥'.repeat(p.rojasLocal||0);
+    const rjV = '🟥'.repeat(p.rojasVisita||0);
+    
+    // Goles
+    const goles = p.goles || [];
+    const golesL = goles.filter(g=>g.local).map(g=>`⚽ ${g.jugador} ${g.minuto}`).join(' · ');
+    const golesV = goles.filter(g=>!g.local).map(g=>`${g.minuto} ${g.jugador} ⚽`).join(' · ');
+    const golesHtml = (golesL||golesV) ? `<div class="goles-wrap"><div class="goles-col">${golesL}</div><div class="goles-col" style="text-align:right">${golesV}</div></div>` : '';
+    
     const reto=getRetoPartido(p.id);
     const retoHtml=reto?`<div style="font-size:10px;color:#8e44ad;margin-top:4px">🎲 ${reto.pregunta}</div>`:'';
     return `<div class="partido ${cls}">
       <div class="ph"><span class="pfase">${p.grupo||p.fase}</span><span class="pstatus ${cls}">${statusLabel}</span></div>
       <div class="equipos">
         <span class="flag">${banderas(p.localCod)}</span>
-        <span class="enombre right">${p.local}</span>
+        <span class="enombre right">${p.local} ${amL}${rjL}</span>
         ${marcador}
-        <span class="enombre">${p.visitante}</span>
+        <span class="enombre">${amV}${rjV} ${p.visitante}</span>
         <span class="flag">${banderas(p.visitanteCod)}</span>
       </div>
+      ${golesHtml}
       ${retoHtml}
       ${p.estadio?`<div style="font-size:10px;color:#bbb;margin-top:4px;text-align:center">${p.estadio}</div>`:''}
     </div>`;
