@@ -254,6 +254,9 @@ export default {
             const mappedId = ESPN_ID_MAP[espnId] || espnId;
             return {
               id: mappedId,
+              espnId: ev.id,
+              homeId: home?.team?.id,
+              awayId: away?.team?.id,
               local: home?.team?.displayName || 'TBD',
               visitante: away?.team?.displayName || 'TBD',
               localCod: home?.team?.abbreviation || '',
@@ -272,17 +275,33 @@ export default {
           }).filter(Boolean);
 
           // Merge: actualizar scores de hoy, NUNCA borrar partidos existentes
-          espnPartidos.forEach(ep => {
+          // Actualizar scores y fetch summary para goles/tarjetas
+          await Promise.all(espnPartidos.map(async ep => {
             const idx = partidosKV.findIndex(p => p.id === ep.id);
-            if(idx >= 0) {
-              // Solo actualizar status y scores, mantener todo lo demas
-              partidosKV[idx].status = ep.status;
-              partidosKV[idx].g1 = ep.g1;
-              partidosKV[idx].g2 = ep.g2;
-              partidosKV[idx].minuto = ep.minuto;
+            if(idx < 0) return;
+            partidosKV[idx].status = ep.status;
+            partidosKV[idx].g1 = ep.g1;
+            partidosKV[idx].g2 = ep.g2;
+            partidosKV[idx].minuto = ep.minuto;
+            if(ep.status === 'LIVE' || ep.status === 'HT' || ep.status === 'FT') {
+              try {
+                const sr = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/summary?event=${ep.espnId}`);
+                const sd = await sr.json();
+                const evts = sd.keyEvents || [];
+                partidosKV[idx].goles = evts
+                  .filter(e => e.scoringPlay || (e.shortText && e.shortText.includes('Goal')))
+                  .map(g => ({
+                    minuto: g.clock?.displayValue || '',
+                    jugador: (g.shortText||'').replace(' Goal','').replace(' - Header','').replace(' - Penalty','').trim(),
+                    local: g.team?.id === ep.homeId,
+                  }));
+                partidosKV[idx].amarillasLocal = evts.filter(e=>e.shortText?.includes('Yellow Card')&&e.team?.id===ep.homeId).length;
+                partidosKV[idx].amarillasVisita = evts.filter(e=>e.shortText?.includes('Yellow Card')&&e.team?.id===ep.awayId).length;
+                partidosKV[idx].rojasLocal = evts.filter(e=>e.shortText?.includes('Red Card')&&e.team?.id===ep.homeId).length;
+                partidosKV[idx].rojasVisita = evts.filter(e=>e.shortText?.includes('Red Card')&&e.team?.id===ep.awayId).length;
+              } catch(e) {}
             }
-            // NO agregar nuevos — usar solo los partidos del KV
-          });
+          }));
         }
 
         // Solo guardar si el KV tiene partidos (no sobreescribir con menos)
