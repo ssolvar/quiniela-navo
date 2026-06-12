@@ -325,7 +325,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v4.2</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v4.3</p>
 </header>
 
 <div class="topbar">
@@ -516,6 +516,18 @@ function entrar() {
   iniciarTimers();
   registrarPresencia();
   iniciarChatTimer();
+  // Refresh automático 2s después para asegurar que todo cargó
+  setTimeout(async () => {
+    try {
+      const [freshDB, chatRes] = await Promise.all([
+        dbRead(),
+        fetch('/api/chat').then(r=>r.json()).catch(()=>({chat:db.chat||[]}))
+      ]);
+      db = freshDB;
+      db.chat = chatRes.chat && chatRes.chat.length > 0 ? chatRes.chat : (db.chat||[]);
+      renderAll();
+    } catch(e) {}
+  }, 2000);
 }
 
 function cerrarSesion() {
@@ -2146,6 +2158,18 @@ function renderAll(){
     iniciarTimers();
     registrarPresencia();
     iniciarChatTimer();
+    // Refresh automático 2s después
+    setTimeout(async () => {
+      try {
+        const [freshDB, chatRes] = await Promise.all([
+          dbRead(),
+          fetch('/api/chat').then(r=>r.json()).catch(()=>({chat:db.chat||[]}))
+        ]);
+        db = freshDB;
+        db.chat = chatRes.chat && chatRes.chat.length > 0 ? chatRes.chat : (db.chat||[]);
+        renderAll();
+      } catch(e) {}
+    }, 2000);
   }
 })();
 </script>
