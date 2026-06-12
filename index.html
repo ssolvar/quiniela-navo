@@ -325,7 +325,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v3.5</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v3.7</p>
 </header>
 
 <div class="topbar">
@@ -367,7 +367,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
     <h4>Sistema de Puntos</h4>
     <div class="pts-row"><span>🎯 Marcador exacto</span><span>+3 pts</span></div>
     <div class="pts-row"><span>✅ Resultado correcto (G/E/P)</span><span>+1 pt</span></div>
-    <div class="pts-row"><span>🎲 Reto del partido acertado</span><span>+1 pt</span></div>
+    <div class="pts-row"><span>🎲 Retos</span><span>Solo estadística</span></div>
     <div class="pts-row"><span>❌ Incorrecto</span><span>0 pts</span></div>
   </div>
 </div>
@@ -402,10 +402,6 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 </div>
 
 <div id="tab-mundial" class="panel">
-  <div class="mundial-section">
-    <h3>📰 Noticias del Mundial</h3>
-    <div id="noticias-cont"><div class="loading">Cargando noticias...</div></div>
-  </div>
   <div class="mundial-section">
     <h3>⚽ Top Goleadores</h3>
     <div id="goleadores-cont"><div class="loading">Cargando goleadores...</div></div>
@@ -934,13 +930,7 @@ function calcPuntos() {
       else if(resultado(pred.g1,pred.g2)===rr)pts[pred.pid]+=1;
     });
   });
-  // Puntos de retos
-  db.retos.forEach(reto=>{
-    if(!reto.puntos)return;
-    Object.entries(reto.puntos).forEach(([pid,p])=>{
-      if(pts[pid]!==undefined) pts[pid]+=p;
-    });
-  });
+  // Retos NO suman puntos — solo son estadística
   return pts;
 }
 
@@ -961,21 +951,20 @@ function renderTabla() {
 
   const tc=document.getElementById('tabla-cont');
   if(!ranking.length){tc.innerHTML='<div class="empty">Agrega participantes para ver la tabla</div>';return;}
-  tc.innerHTML=`<table class="tbl"><thead><tr><th>#</th><th>Participante</th><th>🎯</th><th>✅</th><th>🎲</th><th>Pts</th></tr></thead><tbody>
+  tc.innerHTML=`<table class="tbl"><thead><tr><th>#</th><th>Participante</th><th>🎯</th><th>✅</th><th>Pts</th></tr></thead><tbody>
     ${ranking.map((p,i)=>{
-      let ex=0,co=0,retosPts=0;
+      let ex=0,co=0;
       db.partidos.filter(par=>par.status==='FT').forEach(par=>{
         const pred=db.predicciones.find(pr=>pr.pid===p.id&&pr.mid===par.id);
         if(!pred)return;
         if(pred.g1===par.g1&&pred.g2===par.g2)ex++;
         else if(resultado(pred.g1,pred.g2)===resultado(par.g1,par.g2))co++;
       });
-      db.retos.forEach(r=>{if(r.puntos&&r.puntos[p.id])retosPts+=r.puntos[p.id];});
+
       return `<tr><td>${posChip(i)}</td>
         <td><div style="display:flex;align-items:center;gap:6px">${avatarHtml(p)}<strong>${p.nombre}</strong>${p.id===currentUserId?'<span style="font-size:10px;color:var(--v)">tú</span>':''}</div></td>
         <td><span class="bvd">🎯 ${ex}</span></td>
         <td><span class="bvd" style="background:#555">✅ ${co}</span></td>
-        <td><span class="bvd" style="background:#8e44ad">🎲 ${retosPts}</span></td>
         <td><span class="bpt">${pts[p.id]||0}</span></td></tr>`;
     }).join('')}</tbody></table>`;
 
@@ -1620,7 +1609,6 @@ async function cargarMundial() {
   const cache = mundialCache.fetchedAt ? (ahora - mundialCache.fetchedAt) < 5*60*1000 : false;
   if(!cache) {
     await Promise.allSettled([
-      fetchNoticias(),
       fetchStandings(),
       fetchGoleadores(),
     ]);
@@ -1660,7 +1648,6 @@ async function fetchGoleadores() {
 }
 
 function renderMundial() {
-  renderNoticias();
   renderGoleadores();
   renderStatsQuiniela();
   renderStandings();
