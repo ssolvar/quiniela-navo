@@ -325,7 +325,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v4.1</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v4.2</p>
 </header>
 
 <div class="topbar">
@@ -1515,7 +1515,8 @@ async function importarDatos(event){
       db.predicciones=data.predicciones||[];
       db.premios=data.premios||[];
       db.retos=data.retos||[];
-      await dbWrite(db);renderAll();toast('✅ Datos importados');
+      if(data.partidos&&data.partidos.length>0) db.partidos=data.partidos;
+      await dbWrite(db);renderAll();toast('✅ Datos importados con '+db.partidos.length+' partidos');
     }catch(err){toast('❌ Error: '+err.message);}
     event.target.value='';
   };reader.readAsText(file);
