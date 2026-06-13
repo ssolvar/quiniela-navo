@@ -325,7 +325,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v5.8</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v5.9</p>
 </header>
 
 <div class="topbar">
@@ -1196,15 +1196,33 @@ async function guardarPred() {
 function renderCobertura() {
   const c=document.getElementById('cobertura-cont');
   if(!db.participantes.length){c.innerHTML='<div class="empty">Agrega participantes primero</div>';return;}
-  const proximos=db.partidos.filter(p=>p.status==='PRE'&&p.local!=='TBD'&&p.visitante!=='TBD');
-  if(!proximos.length){c.innerHTML='<p style="font-size:13px;color:#888">No hay partidos próximos.</p>';return;}
-  const headers=proximos.map(p=>`<th>${banderas(p.localCod)}<br>${p.local.split(' ')[0]}<br>vs<br>${banderas(p.visitanteCod)}<br>${p.visitante.split(' ')[0]}</th>`).join('');
+  const ahora=Date.now();
+  const visibles=db.partidos.filter(p=>{
+    if(p.local==='TBD'||p.visitante==='TBD') return false;
+    if(p.status==='PRE'||p.status==='LIVE'||p.status==='HT') return true; // próximos y en vivo siempre
+    if(p.status==='FT'){
+      // mostrar hasta 1 hora después de terminar
+      let fin=p.ftAt;
+      if(!fin){ // partido ya finalizado de antes: estimar fin ~2.5h después del inicio
+        const ko=new Date(`${p.fecha}T${p.hora}:00Z`).getTime();
+        fin=isNaN(ko)?ahora:ko+2.5*60*60*1000;
+      }
+      return ahora < fin + 60*60*1000;
+    }
+    return false;
+  });
+  if(!visibles.length){c.innerHTML='<p style="font-size:13px;color:#888">No hay partidos próximos.</p>';return;}
+  const headers=visibles.map(p=>{
+    const est=p.status==='FT'?'<br><span style="color:#c9a227;font-size:9px">FINAL</span>':(p.status==='LIVE'||p.status==='HT')?'<br><span style="color:var(--rj);font-size:9px">EN VIVO</span>':'';
+    return `<th>${banderas(p.localCod)}<br>${p.local.split(' ')[0]}<br>vs<br>${banderas(p.visitanteCod)}<br>${p.visitante.split(' ')[0]}${est}</th>`;
+  }).join('');
   const rows=db.participantes.map(part=>{
     let faltantes=0;
-    const celdas=proximos.map(partido=>{
+    const celdas=visibles.map(partido=>{
       const pred=db.predicciones.find(pr=>pr.pid===part.id&&pr.mid===partido.id);
       if(pred)return`<td><span style="color:#c9a227;font-weight:700">${pred.g1}-${pred.g2}</span></td>`;
-      faltantes++;return`<td><span style="color:var(--rj)">✗</span></td>`;
+      if(partido.status==='PRE') faltantes++; // solo cuentan los que todavía se pueden llenar
+      return`<td><span style="color:var(--rj)">✗</span></td>`;
     }).join('');
     const color=faltantes===0?'#27ae60':faltantes<=2?'#f39c12':'#e74c3c';
     return`<tr><td><div style="display:flex;align-items:center;gap:5px">${avatarHtml(part)}<span style="font-size:12px;font-weight:600">${part.nombre}</span><span style="font-size:10px;font-weight:700;color:${color}">${faltantes===0?'✅':'⚠️ '+faltantes}</span></div></td>${celdas}</tr>`;
