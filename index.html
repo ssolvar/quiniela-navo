@@ -334,7 +334,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v5.3</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v5.5</p>
 </header>
 
 <div class="topbar">
@@ -1027,21 +1027,24 @@ function renderPartidos() {
     const cls=isFT?'ft':(isLive||isHT)?'live':'pre';
     const minLabel = p.minuto ? ` ${p.minuto}` : '';
     const statusLabel=isFT?'FINALIZADO':isHT?'⏸ MEDIO TIEMPO':isLive?`EN VIVO${minLabel}`:formatFecha(p.fecha,p.hora);
-    const marcador=isFT||isLive||isHT?`<div class="marcador ${cls}">${p.g1} - ${p.g2}</div>`:`<div class="marcador pre">vs</div>`;
-    
+    const marcador=isFT||isLive||isHT?`<span class="marcador ${cls}">${p.g1} - ${p.g2}</span>`:`<span class="marcador pre">vs</span>`;
+
     // Tarjetas y goles
     const goles = p.goles || [];
-    const golesL = goles.filter(g=>g.local).map(g=>`${g.jugador} ${g.minuto}`).join('<br>');
-    const golesV = goles.filter(g=>!g.local).map(g=>`${g.minuto} ${g.jugador}`).join('<br>');
-    const amL = p.amarillasLocal||0, rjL = p.rojasLocal||0;
-    const amV = p.amarillasVisita||0, rjV = p.rojasVisita||0;
-    const tarjL = `${amL>0?'🟨'+amL:''}${rjL>0?'🟥'+rjL:''}`;
-    const tarjV = `${amV>0?'🟨'+amV:''}${rjV>0?'🟥'+rjV:''}`;
+    const golesL = goles.filter(g=>g.local).map(g=>`${g.jugador} ${g.minuto}`).join(', ');
+    const golesV = goles.filter(g=>!g.local).map(g=>`${g.minuto} ${g.jugador}`).join(', ');
+    const amL=p.amarillasLocal||0, rjL=p.rojasLocal||0, amV=p.amarillasVisita||0, rjV=p.rojasVisita||0;
+    const tarjL = (amL>0?`<span class="tcrd am">${amL}🟨</span>`:'')+(rjL>0?`<span class="tcrd rj">${rjL}🟥</span>`:'');
+    const tarjV = (amV>0?`<span class="tcrd am">🟨${amV}</span>`:'')+(rjV>0?`<span class="tcrd rj">🟥${rjV}</span>`:'');
     const hayExtra = tarjL||tarjV||golesL||golesV;
-    const extraHtml = hayExtra ? `<div class="extra-row">
-      <div class="extra-col">${tarjL?`<div class="tarj-txt">${tarjL}</div>`:''}<div class="gol-txt">${golesL}</div></div>
-      <div class="extra-col" style="text-align:right">${tarjV?`<div class="tarj-txt">${tarjV}</div>`:''}<div class="gol-txt">${golesV}</div></div>
-    </div>` : '';
+    const extraHtml = !hayExtra ? '' : `<div class="pextra">
+      <div class="pextra-col">
+        ${tarjL}<span class="pgol">${golesL}</span>
+      </div>
+      <div class="pextra-col pextra-r">
+        ${tarjV}<span class="pgol">${golesV}</span>
+      </div>
+    </div>`;
     const tarjetasHtml = '';
     const golesHtml = '';
     
@@ -1058,7 +1061,6 @@ function renderPartidos() {
       </div>
       ${extraHtml}
       ${retoHtml}
-      ${p.estadio?`<div style="font-size:10px;color:#bbb;margin-top:4px;text-align:center">${p.estadio}</div>`:''}
     </div>`;
   }).join('');
 }
