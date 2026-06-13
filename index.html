@@ -266,31 +266,16 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 .chat-empty{text-align:center;color:#6677aa;font-size:13px;padding:12px}
 .chat-msg-del{background:none;border:none;color:#c8102e;cursor:pointer;font-size:14px;padding:2px 4px;opacity:.6;flex-shrink:0}
 
-.goles-wrap{display:flex;justify-content:space-between;margin-top:4px;padding-top:4px;border-top:1px solid rgba(255,255,255,.1)}
-.goles-list{font-size:10px;color:#8899cc;line-height:1.6}
-.goles-col{flex:1}
-
-/* COBERTURA */
-/* CHAT */
-.chat-wrap{background:#0d1440;border-radius:14px;padding:14px 15px;margin-bottom:10px;box-shadow:0 4px 20px rgba(0,0,0,.4);border:1px solid #1a2a70}
-.chat-title{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;color:var(--do);margin-bottom:10px;display:flex;align-items:center;gap:6px}
-.chat-msgs{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;min-height:40px;max-height:260px;overflow-y:auto;scroll-behavior:smooth}
-.chat-msg{display:flex;align-items:flex-start;gap:8px}
-.chat-msg-body{background:#141e5c;border-radius:10px;padding:7px 10px;flex:1}
-.chat-msg-name{font-size:11px;font-weight:700;color:var(--do);margin-bottom:2px}
-.chat-msg-text{font-size:14px;color:#ffffff;word-break:break-word}
-.chat-msg-time{font-size:10px;color:#6677aa;margin-top:3px}
-.chat-msg.mine .chat-msg-body{background:#1a3a8a}
-.chat-input-wrap{display:flex;gap:8px;align-items:center}
-.chat-input{flex:1;background:#0a0e27;border:1.5px solid #1a2a70;border-radius:20px;padding:10px 14px;color:#fff;font-family:'Inter',sans-serif;font-size:14px;outline:none}
-.chat-input:focus{border-color:var(--do)}
-.chat-send{background:var(--do);border:none;border-radius:20px;padding:10px 16px;color:#0a0e27;font-weight:700;font-size:14px;cursor:pointer;font-family:'Inter',sans-serif;flex-shrink:0}
-.chat-empty{text-align:center;color:#6677aa;font-size:13px;padding:12px}
-.chat-msg-del{background:none;border:none;color:#c8102e;cursor:pointer;font-size:14px;padding:2px 4px;opacity:.6;flex-shrink:0}
-
-.goles-wrap{display:flex;justify-content:space-between;margin-top:4px;padding-top:4px;border-top:1px solid rgba(255,255,255,.1)}
-.goles-list{font-size:10px;color:#8899cc;line-height:1.6}
-.goles-col{flex:1}
+/* GOLES Y TARJETAS EN CARDS DE PARTIDO */
+.pextra{display:flex;justify-content:space-between;gap:10px;margin-top:7px;padding-top:6px;border-top:1px solid #1a2a70}
+.pextra-col{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;font-size:11px}
+.pextra-col.pextra-r{align-items:flex-end;text-align:right}
+.pgol{color:#aab8e0;line-height:1.5;word-break:break-word}
+.pgol:empty{display:none}
+.tcrd{display:inline-flex;align-items:center;gap:2px;font-size:11px;font-weight:700;line-height:1;margin-right:5px}
+.pextra-r .tcrd{margin-right:0;margin-left:5px}
+.tcrd.am{color:#e0b830}
+.tcrd.rj{color:var(--rj)}
 
 /* COBERTURA */
 .cob-table{width:100%;border-collapse:collapse;font-size:11px}
@@ -334,7 +319,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v5.5</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v5.6</p>
 </header>
 
 <div class="topbar">
@@ -1045,9 +1030,7 @@ function renderPartidos() {
         ${tarjV}<span class="pgol">${golesV}</span>
       </div>
     </div>`;
-    const tarjetasHtml = '';
-    const golesHtml = '';
-    
+
     const reto=getRetoPartido(p.id);
     const retoHtml=reto?`<div style="font-size:10px;color:#8e44ad;margin-top:4px">🎲 ${reto.pregunta}</div>`:'';
     return `<div class="partido ${cls}">
