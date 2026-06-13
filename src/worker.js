@@ -315,7 +315,9 @@ export default {
           await Promise.all(espnPartidos.map(async ep => {
             const idx = partidosKV.findIndex(p => p.id === ep.id);
             if(idx < 0) return;
+            const eraFT = partidosKV[idx].status === 'FT';
             partidosKV[idx].status = ep.status;
+            if(ep.status === 'FT' && !eraFT && !partidosKV[idx].ftAt) partidosKV[idx].ftAt = Date.now();
             partidosKV[idx].g1 = ep.g1;
             partidosKV[idx].g2 = ep.g2;
             partidosKV[idx].minuto = ep.minuto;
