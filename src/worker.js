@@ -181,6 +181,10 @@ export default {
                 jugador: (g.shortText||'').replace(' Goal','').replace(' - Header','').replace(' - Penalty','').trim(),
                 local: String(g.team?.id) === String(p.homeId),
               }));
+            const golL = partidosKV[idx].goles.filter(g=>g.local).length;
+            const golV = partidosKV[idx].goles.filter(g=>!g.local).length;
+            partidosKV[idx].g1 = Math.max(partidosKV[idx].g1||0, golL);
+            partidosKV[idx].g2 = Math.max(partidosKV[idx].g2||0, golV);
             partidosKV[idx].amarillasLocal = evts.filter(e=>e.shortText?.includes('Yellow Card')&&String(e.team?.id)===String(p.homeId)).length;
             partidosKV[idx].amarillasVisita = evts.filter(e=>e.shortText?.includes('Yellow Card')&&String(e.team?.id)===String(p.awayId)).length;
             partidosKV[idx].rojasLocal = evts.filter(e=>e.shortText?.includes('Red Card')&&String(e.team?.id)===String(p.homeId)).length;
@@ -327,6 +331,12 @@ export default {
                     jugador: (g.shortText||'').replace(' Goal','').replace(' - Header','').replace(' - Penalty','').trim(),
                     local: String(g.team?.id) === String(ep.homeId),
                   }));
+                // El marcador del scoreboard a veces va con retraso (sobre todo en autogoles).
+                // Derivamos el marcador del array de goles para que nunca quede atrás de los anotadores mostrados.
+                const golL = partidosKV[idx].goles.filter(g=>g.local).length;
+                const golV = partidosKV[idx].goles.filter(g=>!g.local).length;
+                partidosKV[idx].g1 = Math.max(ep.g1||0, golL);
+                partidosKV[idx].g2 = Math.max(ep.g2||0, golV);
                 partidosKV[idx].amarillasLocal = evts.filter(e=>e.shortText?.includes('Yellow Card')&&String(e.team?.id)===String(ep.homeId)).length;
                 partidosKV[idx].amarillasVisita = evts.filter(e=>e.shortText?.includes('Yellow Card')&&String(e.team?.id)===String(ep.awayId)).length;
                 partidosKV[idx].rojasLocal = evts.filter(e=>e.shortText?.includes('Red Card')&&String(e.team?.id)===String(ep.homeId)).length;
