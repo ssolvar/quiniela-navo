@@ -325,12 +325,12 @@ export default {
                   .map(g => ({
                     minuto: g.clock?.displayValue || '',
                     jugador: (g.shortText||'').replace(' Goal','').replace(' - Header','').replace(' - Penalty','').trim(),
-                    local: g.team?.id === ep.homeId,
+                    local: String(g.team?.id) === String(ep.homeId),
                   }));
-                partidosKV[idx].amarillasLocal = evts.filter(e=>e.shortText?.includes('Yellow Card')&&e.team?.id===ep.homeId).length;
-                partidosKV[idx].amarillasVisita = evts.filter(e=>e.shortText?.includes('Yellow Card')&&e.team?.id===ep.awayId).length;
-                partidosKV[idx].rojasLocal = evts.filter(e=>e.shortText?.includes('Red Card')&&e.team?.id===ep.homeId).length;
-                partidosKV[idx].rojasVisita = evts.filter(e=>e.shortText?.includes('Red Card')&&e.team?.id===ep.awayId).length;
+                partidosKV[idx].amarillasLocal = evts.filter(e=>e.shortText?.includes('Yellow Card')&&String(e.team?.id)===String(ep.homeId)).length;
+                partidosKV[idx].amarillasVisita = evts.filter(e=>e.shortText?.includes('Yellow Card')&&String(e.team?.id)===String(ep.awayId)).length;
+                partidosKV[idx].rojasLocal = evts.filter(e=>e.shortText?.includes('Red Card')&&String(e.team?.id)===String(ep.homeId)).length;
+                partidosKV[idx].rojasVisita = evts.filter(e=>e.shortText?.includes('Red Card')&&String(e.team?.id)===String(ep.awayId)).length;
               } catch(e) {}
             }
           }));
