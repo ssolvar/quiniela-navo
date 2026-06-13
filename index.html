@@ -272,7 +272,8 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 .pextra-col.pextra-r{align-items:flex-end;text-align:right}
 .pgol{color:#aab8e0;line-height:1.5;word-break:break-word}
 .pgol:empty{display:none}
-.tcrd{display:inline-flex;align-items:center;gap:2px;font-size:11px;font-weight:700;line-height:1;margin-right:5px}
+.tcrd{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;line-height:1;margin-right:7px}
+.tcrd .tn{font-size:12px}
 .pextra-r .tcrd{margin-right:0;margin-left:5px}
 .tcrd.am{color:#e0b830}
 .tcrd.rj{color:var(--rj)}
@@ -319,7 +320,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v5.6</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v5.7</p>
 </header>
 
 <div class="topbar">
@@ -1019,8 +1020,8 @@ function renderPartidos() {
     const golesL = goles.filter(g=>g.local).map(g=>`${g.jugador} ${g.minuto}`).join(', ');
     const golesV = goles.filter(g=>!g.local).map(g=>`${g.minuto} ${g.jugador}`).join(', ');
     const amL=p.amarillasLocal||0, rjL=p.rojasLocal||0, amV=p.amarillasVisita||0, rjV=p.rojasVisita||0;
-    const tarjL = (amL>0?`<span class="tcrd am">${amL}🟨</span>`:'')+(rjL>0?`<span class="tcrd rj">${rjL}🟥</span>`:'');
-    const tarjV = (amV>0?`<span class="tcrd am">🟨${amV}</span>`:'')+(rjV>0?`<span class="tcrd rj">🟥${rjV}</span>`:'');
+    const tarjL = (amL>0?`<span class="tcrd am"><span class="tn">${amL}</span>🟨</span>`:'')+(rjL>0?`<span class="tcrd rj"><span class="tn">${rjL}</span>🟥</span>`:'');
+    const tarjV = (amV>0?`<span class="tcrd am">🟨<span class="tn">${amV}</span></span>`:'')+(rjV>0?`<span class="tcrd rj">🟥<span class="tn">${rjV}</span></span>`:'');
     const hayExtra = tarjL||tarjV||golesL||golesV;
     const extraHtml = !hayExtra ? '' : `<div class="pextra">
       <div class="pextra-col">
