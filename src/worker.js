@@ -382,7 +382,7 @@ export default {
       try {
         const res = await fetch(`${FOOTBALL_BASE}/competitions/WC/scorers?season=2026&limit=10`, { headers: {'X-Auth-Token':FOOTBALL_KEY} });
         const data = await res.json();
-        return new Response(JSON.stringify(data), { headers: {...CORS,'Cache-Control':'public, max-age=300'} });
+        return new Response(JSON.stringify(data), { headers: {...CORS,'Cache-Control':'public, max-age=120'} });
       } catch(e) {
         return new Response(JSON.stringify({scorers:[],error:e.message}), { headers: CORS });
       }
