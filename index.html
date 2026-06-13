@@ -325,7 +325,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v5.9</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v6.0</p>
 </header>
 
 <div class="topbar">
@@ -564,6 +564,23 @@ function aplicarRol() {
 // =============================================
 // DB via Cloudflare KV
 // =============================================
+// El KV es eventualmente consistente: tras escribir un campo, una lectura
+// inmediata puede devolver el valor viejo. dirtyHasta marca por campo hasta
+// cuándo gana la copia local, para que el polling no revierta lo recién escrito.
+let dirtyHasta = {};
+function marcarDirty(campos) {
+  const t = Date.now() + 60*1000; // 60s de ventana anti-stale
+  Object.keys(campos).forEach(f => { dirtyHasta[f] = t; });
+}
+function preservarLocal(fresh, prev) {
+  const ahora = Date.now();
+  for(const f of Object.keys(dirtyHasta)) {
+    if(dirtyHasta[f] > ahora) { if(prev[f] !== undefined) fresh[f] = prev[f]; }
+    else delete dirtyHasta[f];
+  }
+  return fresh;
+}
+
 async function dbRead() {
   const res = await fetch('/api/db');
   if(!res.ok) throw new Error('DB read: '+res.status);
@@ -592,11 +609,13 @@ async function dbWrite(data) {
 async function cargarDatos() {
   setSyncStatus('loading');
   try {
+    const prev = db;
     const [fresh, chatRes] = await Promise.all([
       dbRead(),
       fetch('/api/chat').then(r=>r.json()).catch(()=>({chat:db.chat||[]}))
     ]);
     const chatGuardado = chatRes.chat && chatRes.chat.length > 0 ? chatRes.chat : db.chat || [];
+    preservarLocal(fresh, prev); // no pisar campos escritos localmente hace <60s (KV eventual)
     db = fresh;
     db.chat = chatGuardado; // siempre preservar chat
     // Actualizar partidos si hace >1h o si hay partido en vivo (cada 2 min)
@@ -614,14 +633,16 @@ async function cargarDatos() {
 }
 
 async function guardarCampos(campos) {
+  // Optimista: actualizar local y marcar dirty ANTES del POST, para que un
+  // poll concurrente no pise el cambio con una lectura vieja del KV.
+  db = { ...db, ...campos };
+  marcarDirty(campos);
   try {
-    // Con KV cada campo se guarda independientemente — sin race conditions
     await fetch('/api/db', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify(campos)
     });
-    db = { ...db, ...campos };
   } catch(e) { console.error('Error guardando:', e); toast('❌ Error guardando'); }
 }
 
@@ -696,10 +717,12 @@ function iniciarTimers() {
     } else {
       // Actualizar online sin recargar partidos
       try {
+        const prev = db;
         const [fresh, chatRes] = await Promise.all([
           dbRead(),
           fetch('/api/chat').then(r=>r.json()).catch(()=>({chat:db.chat||[]}))
         ]);
+        preservarLocal(fresh, prev); // no pisar avatar/retos/etc. recién escritos (KV eventual)
         if(chatRes.chat && chatRes.chat.length > 0) db.chat = chatRes.chat;
         db.presencia = fresh.presencia||[];
         db.predicciones = fresh.predicciones||[];
@@ -707,6 +730,7 @@ function iniciarTimers() {
         db.chat = chatRes.chat||db.chat||[];
         db.participantes = fresh.participantes||db.participantes;
         db.premios = fresh.premios||db.premios;
+        calcularPuntosRetos(); // resolver retos al instante si hay partidos FT
         renderOnline();
         renderRetoPrincipal();
         renderTabla();
@@ -791,12 +815,7 @@ function asignarRetosAutomaticos() {
       }
     }
   });
-  if(cambio) {
-    dbRead().then(fresco => {
-      fresco.retos = db.retos;
-      dbWrite(fresco).catch(e=>console.error('Error saving retos:',e));
-    }).catch(e=>console.error('Error reading before saving retos:',e));
-  }
+  if(cambio) guardarCampos({retos: db.retos});
 }
 
 function calcularPuntosRetos() {
@@ -816,12 +835,7 @@ function calcularPuntosRetos() {
     });
     cambio = true;
   });
-  if(cambio) {
-    dbRead().then(fresco => {
-      fresco.retos = db.retos;
-      dbWrite(fresco).catch(e=>console.error('Error saving reto puntos:',e));
-    }).catch(e=>console.error('Error reading before saving reto puntos:',e));
-  }
+  if(cambio) guardarCampos({retos: db.retos});
 }
 
 function getRetoPartido(partidoId) {
@@ -1597,14 +1611,20 @@ function triggerAvatarUpload(id){
   inp.onchange=e=>{
     const file=e.target.files[0];if(!file)return;
     const reader=new FileReader();
+    reader.onerror=()=>toast('❌ No se pudo leer el archivo');
     reader.onload=ev=>{
-      const img=new Image();img.onload=()=>{
-        const canvas=document.createElement('canvas');canvas.width=120;canvas.height=120;
-        const ctx=canvas.getContext('2d');
-        const min=Math.min(img.width,img.height),sx=(img.width-min)/2,sy=(img.height-min)/2;
-        ctx.drawImage(img,sx,sy,min,min,0,0,120,120);
-        const part=db.participantes.find(p=>p.id===id);
-        if(part){part.avatar=canvas.toDataURL('image/jpeg',.8);guardarCampos({participantes:db.participantes});renderAll();toast('✅ Foto actualizada');}
+      const img=new Image();
+      img.onerror=()=>toast('❌ No se pudo leer la imagen. Probá con JPG o PNG (los HEIC de iPhone a veces fallan).');
+      img.onload=()=>{
+        try{
+          const canvas=document.createElement('canvas');canvas.width=120;canvas.height=120;
+          const ctx=canvas.getContext('2d');
+          const min=Math.min(img.width,img.height),sx=(img.width-min)/2,sy=(img.height-min)/2;
+          ctx.drawImage(img,sx,sy,min,min,0,0,120,120);
+          const part=db.participantes.find(p=>p.id===id);
+          if(part){part.avatar=canvas.toDataURL('image/jpeg',.8);guardarCampos({participantes:db.participantes});renderAll();toast('✅ Foto actualizada');}
+          else toast('❌ No se encontró el participante');
+        }catch(err){toast('❌ Error procesando la imagen');}
       };img.src=ev.target.result;
     };reader.readAsDataURL(file);
   };inp.click();
