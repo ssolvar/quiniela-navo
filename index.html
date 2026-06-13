@@ -235,6 +235,11 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 .goleador-info strong{font-size:14px;display:block}
 .goleador-info span{font-size:11px;color:#888}
 .goleador-goles{font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--v)}
+.goleadores-card{max-height:340px;overflow-y:auto}
+.goleadores-card::-webkit-scrollbar{width:6px}
+.goleadores-card::-webkit-scrollbar-thumb{background:#1a2a70;border-radius:6px}
+.goleadores-card::-webkit-scrollbar-track{background:transparent}
+.goleadores-card{scrollbar-width:thin;scrollbar-color:#1a2a70 transparent}
 /* NOTICIAS */
 .noticia-item{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.1);cursor:pointer;text-decoration:none;color:#fff}
 .noticia-item:last-child{border-bottom:none}
@@ -320,7 +325,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v5.7</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v5.8</p>
 </header>
 
 <div class="topbar">
@@ -1715,23 +1720,45 @@ function renderNoticias() {
 function renderGoleadores() {
   const c = document.getElementById('goleadores-cont');
   if(!c) return;
-  const scorers = mundialCache.goleadores;
-  if(!scorers || !scorers.length) {
+  const medals = ['🥇','🥈','🥉'];
+
+  // 1) Tabla en vivo construida desde los goles de ESPN (se actualiza junto al partido)
+  const tally = {};
+  (db.partidos||[]).forEach(p => {
+    (p.goles||[]).forEach(g => {
+      const nombre = (g.jugador||'').trim();
+      if(!nombre || /\bown\b/i.test(nombre)) return; // autogoles no cuentan al jugador
+      const cod = g.local ? p.localCod : p.visitanteCod;
+      const equipo = g.local ? p.local : p.visitante;
+      if(!tally[nombre]) tally[nombre] = { nombre, goles:0, cod, equipo };
+      tally[nombre].goles++;
+    });
+  });
+  let lista = Object.values(tally).sort((a,b)=>b.goles-a.goles).slice(0,10);
+
+  // 2) Respaldo: football-data solo si todavía no hay goles capturados
+  if(!lista.length) {
+    lista = (mundialCache.goleadores||[]).slice(0,10).map(s => ({
+      nombre: s.player?.name || '?',
+      goles: s.goals || s.numberOfGoals || 0,
+      cod: s.team?.tla || '',
+      equipo: s.team?.name || s.team?.shortName || ''
+    }));
+  }
+
+  if(!lista.length) {
     c.innerHTML = '<div class="empty">Los goleadores aparecerán cuando empiece el torneo</div>'; return;
   }
-  const medals = ['🥇','🥈','🥉'];
-  c.innerHTML = '<div class="card">' + scorers.slice(0,10).map((s,i) => {
-    const equipo = s.team?.name || s.team?.shortName || '';
-    const equipoCod = s.team?.tla || '';
-    return `<div class="goleador-item">
+
+  c.innerHTML = '<div class="card goleadores-card">' + lista.map((s,i) =>
+    `<div class="goleador-item">
       <span class="goleador-rank">${medals[i]||'#'+(i+1)}</span>
       <div class="goleador-info">
-        <strong>${s.player?.name||'?'}</strong>
-        <span>${banderas(equipoCod)} ${equipo}</span>
+        <strong>${s.nombre}</strong>
+        <span>${banderas(s.cod)} ${s.equipo}</span>
       </div>
-      <span class="goleador-goles" style="color:#c9a227">${s.goals||s.numberOfGoals||0} ⚽</span>
-    </div>`;
-  }).join('') + '</div>';
+      <span class="goleador-goles" style="color:#c9a227">${s.goles} ⚽</span>
+    </div>`).join('') + '</div>';
 }
 
 function renderStatsQuiniela() {
@@ -2166,6 +2193,7 @@ function renderAll(){
   renderPremios();
   renderRetosTabla();
   renderStatsQuiniela();
+  renderGoleadores();
 }
 
 // =============================================
