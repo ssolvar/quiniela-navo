@@ -1,5 +1,4 @@
 const FOOTBALL_KEY  = '9629fc7059cd4418a697d0d21f2eb10b';
-const NEWS_KEY      = 'dd7695a891a046fabb270718eb220064';
 const FOOTBALL_BASE = 'https://api.football-data.org/v4';
 const HTML_URL      = 'https://raw.githubusercontent.com/ssolvar/quiniela-navo/main/index.html';
 
@@ -387,35 +386,6 @@ export default {
         return new Response(JSON.stringify(data), { headers: {...CORS,'Cache-Control':'public, max-age=120'} });
       } catch(e) {
         return new Response(JSON.stringify({scorers:[],error:e.message}), { headers: CORS });
-      }
-    }
-
-    // ==========================================
-    // NOTICIAS
-    // ==========================================
-    if (path === '/api/noticias') {
-      try {
-        const rssUrl = 'https://news.google.com/rss/search?q=Mundial+2026+OR+Copa+del+Mundo+2026+OR+FIFA+2026+OR+gol+Mundial+OR+partido+Mundial+OR+seleccion+Mundial+OR+resultado+Copa+OR+clasificacion+Mundial+OR+goleador+Mundial+OR+arbitro+Mundial&hl=es-419&gl=US&ceid=US:es-419';
-        const res = await fetch(rssUrl, { headers: {'User-Agent':'Mozilla/5.0 (compatible; QuinielaNavo/1.0)'} });
-        const xml = await res.text();
-        const items = [];
-        for (const match of xml.matchAll(/<item>([\s\S]*?)<\/item>/g)) {
-          const item = match[1];
-          const title = (item.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/) || item.match(/<title>(.*?)<\/title>/))?.[1]?.trim() || '';
-          const link = (item.match(/<link>(.*?)<\/link>/) || [])[1]?.trim() || '';
-          const pubDate = (item.match(/<pubDate>(.*?)<\/pubDate>/) || [])[1]?.trim() || '';
-          const source = (item.match(/<source[^>]*>(.*?)<\/source>/) || [])[1]?.trim() || '';
-          if(title && link) items.push({ title, url:link, publishedAt:pubDate, source:{name:source}, urlToImage:null });
-          if(items.length >= 20) break;
-        }
-        items.sort((a,b) => new Date(b.publishedAt) - new Date(a.publishedAt));
-        const hace24h = Date.now() - 24*60*60*1000;
-        const recientes = items.filter(i => new Date(i.publishedAt).getTime() > hace24h);
-        return new Response(JSON.stringify({ articles: recientes.length >= 5 ? recientes.slice(0,10) : items.slice(0,10) }), {
-          headers: {...CORS,'Cache-Control':'public, max-age=300'}
-        });
-      } catch(e) {
-        return new Response(JSON.stringify({articles:[],error:e.message}), { headers: CORS });
       }
     }
 
