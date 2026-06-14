@@ -240,13 +240,6 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 .goleadores-card::-webkit-scrollbar-thumb{background:#1a2a70;border-radius:6px}
 .goleadores-card::-webkit-scrollbar-track{background:transparent}
 .goleadores-card{scrollbar-width:thin;scrollbar-color:#1a2a70 transparent}
-/* NOTICIAS */
-.noticia-item{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.1);cursor:pointer;text-decoration:none;color:#fff}
-.noticia-item:last-child{border-bottom:none}
-.noticia-img{width:80px;height:60px;border-radius:8px;object-fit:cover;flex-shrink:0;background:var(--gr)}
-.noticia-body{flex:1;min-width:0}
-.noticia-body h4{font-size:13px;font-weight:600;line-height:1.3;margin-bottom:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.noticia-body span{font-size:11px;color:#888}
 /* STATS */
 .stat-item{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #1a2a70;font-size:13px;flex-wrap:wrap;gap:4px}
 .stat-item:last-child{border-bottom:none}
@@ -325,7 +318,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v6.0</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v6.4</p>
 </header>
 
 <div class="topbar">
@@ -516,18 +509,8 @@ function entrar() {
   iniciarTimers();
   registrarPresencia();
   iniciarChatTimer();
-  // Refresh automático 2s después para asegurar que todo cargó
-  setTimeout(async () => {
-    try {
-      const [freshDB, chatRes] = await Promise.all([
-        dbRead(),
-        fetch('/api/chat').then(r=>r.json()).catch(()=>({chat:db.chat||[]}))
-      ]);
-      db = freshDB;
-      db.chat = chatRes.chat && chatRes.chat.length > 0 ? chatRes.chat : (db.chat||[]);
-      renderAll();
-    } catch(e) {}
-  }, 2000);
+  // Al entrar: forzar actualización de TODAS las APIs
+  precargarTodo();
 }
 
 function cerrarSesion() {
@@ -606,7 +589,7 @@ async function dbWrite(data) {
   if(!res.ok) throw new Error('DB write: '+res.status);
 }
 
-async function cargarDatos() {
+async function cargarDatos(forzarPartidos=false) {
   setSyncStatus('loading');
   try {
     const prev = db;
@@ -619,7 +602,7 @@ async function cargarDatos() {
     db = fresh;
     db.chat = chatGuardado; // siempre preservar chat
     // Actualizar partidos si hace >1h o si hay partido en vivo (cada 2 min)
-    await actualizarPartidosSiNecesario();
+    await actualizarPartidosSiNecesario(forzarPartidos);
     // Asignar retos a partidos que los necesiten
     asignarRetosAutomaticos();
     // Calcular puntos de retos terminados
@@ -646,6 +629,16 @@ async function guardarCampos(campos) {
   } catch(e) { console.error('Error guardando:', e); toast('❌ Error guardando'); }
 }
 
+// Al entrar: forzar la actualización de TODAS las APIs (partidos, db, standings, goleadores)
+async function precargarTodo() {
+  setSyncStatus('loading');
+  try {
+    await cargarDatos(true);    // fuerza /api/partidos + /api/db
+    await cargarMundial(true);  // fuerza /api/standings, /api/scorers
+    setSyncStatus('ok');
+  } catch(e) { setSyncStatus('error'); console.error('Precarga inicial:', e); }
+}
+
 // =============================================
 // FOOTBALL API
 // =============================================
@@ -663,7 +656,7 @@ function normPartido(m) {
   };
 }
 
-async function actualizarPartidosSiNecesario() {
+async function actualizarPartidosSiNecesario(forzar=false) {
   const ahora = Date.now();
   const ultimoFetch = db.partidosFetchedAt ? new Date(db.partidosFetchedAt).getTime() : 0;
   const hayLive = db.partidos.some(p=>p.status==='LIVE'||p.status==='HT');
@@ -686,7 +679,7 @@ async function actualizarPartidosSiNecesario() {
   else if(hayPartidoReciente) intervalo = 5*60*1000; // partido recién terminado: cada 5 min
   else intervalo = 60*60*1000;                 // sin partido: cada 1 hora
 
-  if((ahora - ultimoFetch) < intervalo) return;
+  if(!forzar && (ahora - ultimoFetch) < intervalo) return;
 
   try {
     // /api/partidos actualiza KV directamente en el Worker
@@ -1194,8 +1187,11 @@ async function guardarPred() {
   const g2 = document.getElementById('pg2').value;
   const msg = document.getElementById('pred-msg');
   if(!pid||!mid||g1===''||g2===''){msg.textContent='⚠️ Completa todos los campos';msg.style.color='var(--rj)';return;}
-  const partido=db.partidos.find(p=>p.id===mid);
-  if(partido&&partido.status!=='PRE'){msg.textContent='🔒 Este partido ya inició';msg.style.color='var(--rj)';return;}
+  const partido=db.partidos.find(p=>String(p.id)===String(mid));
+  if(!partido){msg.textContent='🔒 Partido no encontrado';msg.style.color='var(--rj)';return;}
+  const inicioMs=partido.fecha&&partido.hora?new Date(partido.fecha+'T'+partido.hora+':00Z').getTime():NaN;
+  const yaInicio=partido.status!=='PRE'||(!isNaN(inicioMs)&&Date.now()>=inicioMs);
+  if(yaInicio){msg.textContent='🔒 Este partido ya inició';msg.style.color='var(--rj)';return;}
   const existe=db.predicciones.find(p=>p.pid===pid&&p.mid===mid);
   if(existe){existe.g1=parseInt(g1);existe.g2=parseInt(g2);}
   else db.predicciones.push({pid,mid,g1:parseInt(g1),g2:parseInt(g2)});
@@ -1681,43 +1677,21 @@ const STANDINGS_URL = 'https://api.football-data.org/v4/competitions/WC/standing
 const SCORERS_URL   = 'https://api.football-data.org/v4/competitions/WC/scorers?season=2026&limit=10';
 
 // Cache para no repetir llamadas
-let mundialCache = { noticias:null, standings:null, goleadores:null, fetchedAt:null };
+let mundialCache = { goleadores:null, fetchedAt:null };
 
 // =============================================
 // MUNDIAL — FETCH Y RENDER
 // =============================================
-async function cargarMundial() {
+async function cargarMundial(forzar=false) {
   const ahora = Date.now();
-  const cache = mundialCache.fetchedAt ? (ahora - mundialCache.fetchedAt) < 5*60*1000 : false;
+  const cache = !forzar && mundialCache.fetchedAt ? (ahora - mundialCache.fetchedAt) < 5*60*1000 : false;
   if(!cache) {
     await Promise.allSettled([
-      fetchStandings(),
       fetchGoleadores(),
     ]);
     mundialCache.fetchedAt = ahora;
   }
   renderMundial();
-}
-
-async function fetchNoticias() {
-  try {
-    const res = await fetch('/api/noticias');
-    if(!res.ok) throw new Error(res.status);
-    const data = await res.json();
-    mundialCache.noticias = (data.articles||[]).filter(a=>a.title&&a.title!=='[Removed]');
-  } catch(e) {
-    console.error('Noticias:', e.message);
-    mundialCache.noticias = [];
-  }
-}
-
-async function fetchStandings() {
-  try {
-    const res = await fetch('/api/standings');
-    if(!res.ok) throw new Error(res.status);
-    const data = await res.json();
-    mundialCache.standings = data.standings || [];
-  } catch(e) { console.error('Standings:', e.message); mundialCache.standings = []; }
 }
 
 async function fetchGoleadores() {
@@ -1733,26 +1707,6 @@ function renderMundial() {
   renderGoleadores();
   renderStatsQuiniela();
   renderStandings();
-}
-
-function renderNoticias() {
-  const c = document.getElementById('noticias-cont');
-  if(!c) return;
-  const arts = mundialCache.noticias;
-  if(!arts || !arts.length) {
-    c.innerHTML = '<div class="empty">No hay noticias disponibles</div>'; return;
-  }
-  c.innerHTML = arts.filter(a=>a.title&&a.title!=='[Removed]').slice(0,10).map(a => {
-    const fecha = a.publishedAt ? new Date(a.publishedAt).toLocaleDateString('es-CR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'America/Costa_Rica'}) : '';
-    const img = a.urlToImage ? `<img class="noticia-img" src="${a.urlToImage}" onerror="this.style.display='none'" loading="lazy">` : '';
-    return `<a class="noticia-item" href="${a.url}" target="_blank" rel="noopener" style="text-decoration:none">
-      ${img}
-      <div class="noticia-body">
-        <h4 style="color:#fff;font-weight:600">${a.title}</h4>
-        <span style="color:rgba(255,255,255,.55)">${a.source?.name||''} · ${fecha}</span>
-      </div>
-    </a>`;
-  }).join('');
 }
 
 function renderGoleadores() {
@@ -1967,33 +1921,49 @@ function renderStatsQuiniela() {
 function renderStandings() {
   const c = document.getElementById('standings-cont');
   if(!c) return;
-  const standings = mundialCache.standings;
-  if(!standings || !standings.length) {
-    c.innerHTML = '<div class="empty" style="color:rgba(255,255,255,.5)">Los standings aparecerán cuando empiece el torneo</div>';
+  // Calcular posiciones por grupo desde nuestros propios partidos (no depende de /api/standings)
+  const grupos = {}; // "Grupo A" -> { cod: {cod,nombre,pj,g,e,p,gf,gc,pts} }
+  (db.partidos||[]).forEach(p => {
+    if(!p.grupo || p.fase!=='Fase de Grupos') return;
+    if(p.local==='TBD'||p.visitante==='TBD') return;
+    if(!grupos[p.grupo]) grupos[p.grupo] = {};
+    const t = grupos[p.grupo];
+    const ensure = (cod,nombre)=>{ if(!t[cod]) t[cod]={cod,nombre,pj:0,g:0,e:0,p:0,gf:0,gc:0,pts:0}; };
+    ensure(p.localCod, p.local);
+    ensure(p.visitanteCod, p.visitante);
+    // solo cuentan partidos terminados con marcador
+    if(p.status==='FT' && p.g1!=null && p.g2!=null) {
+      const L=t[p.localCod], V=t[p.visitanteCod];
+      L.pj++; V.pj++;
+      L.gf+=p.g1; L.gc+=p.g2; V.gf+=p.g2; V.gc+=p.g1;
+      if(p.g1>p.g2){ L.g++; L.pts+=3; V.p++; }
+      else if(p.g1<p.g2){ V.g++; V.pts+=3; L.p++; }
+      else { L.e++; V.e++; L.pts++; V.pts++; }
+    }
+  });
+  const nombres = Object.keys(grupos).sort();
+  if(!nombres.length) {
+    c.innerHTML = '<div class="empty" style="color:rgba(255,255,255,.5)">Las posiciones por grupo aparecerán cuando haya partidos de fase de grupos</div>';
     return;
   }
-  // Solo mostrar tipo TOTAL, no HOME ni AWAY
-  const soloTotal = standings.filter(grp => grp.type === 'TOTAL');
-  const grupos = soloTotal.length ? soloTotal : standings;
-  c.innerHTML = grupos.map(grp => {
-    const grupoNom = grp.group || 'Grupo';
-    const tabla = grp.table || [];
+  c.innerHTML = nombres.map(gn => {
+    const tabla = Object.values(grupos[gn]).sort((a,b)=>
+      b.pts-a.pts || ((b.gf-b.gc)-(a.gf-a.gc)) || (b.gf-a.gf) || a.nombre.localeCompare(b.nombre));
     const rows = tabla.map((t,i) => {
       const clasifica = i < 2; // top 2 clasifican
-      const posClass = clasifica ? 'q' : 'tbd';
       return `<tr class="${clasifica?'clasifica':''}">
-        <td><span class="standing-pos ${posClass}">${t.position}</span>${banderas(t.team?.tla||'')} ${t.team?.shortName||t.team?.name||''}</td>
-        <td>${t.playedGames||0}</td>
-        <td>${t.won||0}</td>
-        <td>${t.draw||0}</td>
-        <td>${t.lost||0}</td>
-        <td>${t.goalsFor||0}</td>
-        <td>${t.goalsAgainst||0}</td>
-        <td><strong>${t.points||0}</strong></td>
+        <td><span class="standing-pos ${clasifica?'q':'tbd'}">${i+1}</span>${banderas(t.cod)} ${t.nombre}</td>
+        <td>${t.pj}</td>
+        <td>${t.g}</td>
+        <td>${t.e}</td>
+        <td>${t.p}</td>
+        <td>${t.gf}</td>
+        <td>${t.gc}</td>
+        <td><strong>${t.pts}</strong></td>
       </tr>`;
     }).join('');
     return `<div class="standing-group">
-      <div class="standing-group-title">🏆 ${grupoNom}</div>
+      <div class="standing-group-title">🏆 ${gn}</div>
       <table class="standing-table">
         <thead><tr>
           <th>Equipo</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>Pts</th>
@@ -2256,18 +2226,8 @@ function renderAll(){
     iniciarTimers();
     registrarPresencia();
     iniciarChatTimer();
-    // Refresh automático 2s después
-    setTimeout(async () => {
-      try {
-        const [freshDB, chatRes] = await Promise.all([
-          dbRead(),
-          fetch('/api/chat').then(r=>r.json()).catch(()=>({chat:db.chat||[]}))
-        ]);
-        db = freshDB;
-        db.chat = chatRes.chat && chatRes.chat.length > 0 ? chatRes.chat : (db.chat||[]);
-        renderAll();
-      } catch(e) {}
-    }, 2000);
+    // Al entrar: forzar actualización de TODAS las APIs
+    precargarTodo();
   }
 })();
 </script>
