@@ -318,7 +318,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v6.4</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v6.7</p>
 </header>
 
 <div class="topbar">
@@ -603,6 +603,8 @@ async function cargarDatos(forzarPartidos=false) {
     db.chat = chatGuardado; // siempre preservar chat
     // Actualizar partidos si hace >1h o si hay partido en vivo (cada 2 min)
     await actualizarPartidosSiNecesario(forzarPartidos);
+    // Rellenar goles de partidos terminados (para que la tabla de goleadores sea correcta)
+    await backfillGoles();
     // Asignar retos a partidos que los necesiten
     asignarRetosAutomaticos();
     // Calcular puntos de retos terminados
@@ -613,6 +615,19 @@ async function cargarDatos(forzarPartidos=false) {
     setSyncStatus('error');
     console.error('Error cargando:', e);
   }
+}
+
+// Rellena los goles (con nombre de jugador) de partidos FT que quedaron sin goles,
+// usando la ruta del worker que lee el summary de ESPN. Solo actúa si falta alguno.
+async function backfillGoles() {
+  try {
+    const faltan = (db.partidos||[]).some(p => p.status==='FT' && (!p.goles || p.goles.length===0) && p.espnId);
+    if(!faltan) return false;
+    await fetch('/api/partidos/goles'); // rellena goles/tarjetas de FT en el KV
+    const fresh = await dbRead();
+    if(fresh && fresh.partidos) db.partidos = fresh.partidos;
+    return true;
+  } catch(e) { console.error('backfillGoles:', e); return false; }
 }
 
 async function guardarCampos(campos) {
@@ -633,8 +648,8 @@ async function guardarCampos(campos) {
 async function precargarTodo() {
   setSyncStatus('loading');
   try {
-    await cargarDatos(true);    // fuerza /api/partidos + /api/db
-    await cargarMundial(true);  // fuerza /api/standings, /api/scorers
+    await cargarDatos(true);    // fuerza /api/partidos + /api/db + backfill de goles
+    await cargarMundial();       // renderiza goleadores y standings (desde db.partidos)
     setSyncStatus('ok');
   } catch(e) { setSyncStatus('error'); console.error('Precarga inicial:', e); }
 }
@@ -1677,30 +1692,13 @@ const STANDINGS_URL = 'https://api.football-data.org/v4/competitions/WC/standing
 const SCORERS_URL   = 'https://api.football-data.org/v4/competitions/WC/scorers?season=2026&limit=10';
 
 // Cache para no repetir llamadas
-let mundialCache = { goleadores:null, fetchedAt:null };
 
 // =============================================
 // MUNDIAL — FETCH Y RENDER
 // =============================================
-async function cargarMundial(forzar=false) {
-  const ahora = Date.now();
-  const cache = !forzar && mundialCache.fetchedAt ? (ahora - mundialCache.fetchedAt) < 5*60*1000 : false;
-  if(!cache) {
-    await Promise.allSettled([
-      fetchGoleadores(),
-    ]);
-    mundialCache.fetchedAt = ahora;
-  }
+async function cargarMundial() {
+  // Goleadores y standings se calculan desde db.partidos; solo hay que renderizar
   renderMundial();
-}
-
-async function fetchGoleadores() {
-  try {
-    const res = await fetch('/api/scorers');
-    if(!res.ok) throw new Error(res.status);
-    const data = await res.json();
-    mundialCache.goleadores = data.scorers || [];
-  } catch(e) { console.error('Scorers:', e.message); mundialCache.goleadores = []; }
 }
 
 function renderMundial() {
@@ -1715,10 +1713,12 @@ function renderGoleadores() {
   const medals = ['🥇','🥈','🥉'];
 
   // 1) Tabla en vivo construida desde los goles de ESPN (se actualiza junto al partido)
+  // Limpia sufijos de ESPN: "X Goal", "X - Header", "X - Volley", "X Penalty - Scored", etc.
+  const limpiar = (txt) => (txt||'').split(' - ')[0].replace(/\s+(Goal|Penalty|Header|Volley)$/i,'').trim();
   const tally = {};
   (db.partidos||[]).forEach(p => {
     (p.goles||[]).forEach(g => {
-      const nombre = (g.jugador||'').trim();
+      const nombre = limpiar(g.jugador);
       if(!nombre || /\bown\b/i.test(nombre)) return; // autogoles no cuentan al jugador
       const cod = g.local ? p.localCod : p.visitanteCod;
       const equipo = g.local ? p.local : p.visitante;
@@ -1727,16 +1727,6 @@ function renderGoleadores() {
     });
   });
   let lista = Object.values(tally).sort((a,b)=>b.goles-a.goles).slice(0,10);
-
-  // 2) Respaldo: football-data solo si todavía no hay goles capturados
-  if(!lista.length) {
-    lista = (mundialCache.goleadores||[]).slice(0,10).map(s => ({
-      nombre: s.player?.name || '?',
-      goles: s.goals || s.numberOfGoals || 0,
-      cod: s.team?.tla || '',
-      equipo: s.team?.name || s.team?.shortName || ''
-    }));
-  }
 
   if(!lista.length) {
     c.innerHTML = '<div class="empty">Los goleadores aparecerán cuando empiece el torneo</div>'; return;
@@ -2202,6 +2192,7 @@ function renderAll(){
   renderRetosTabla();
   renderStatsQuiniela();
   renderGoleadores();
+  renderStandings();
 }
 
 // =============================================
