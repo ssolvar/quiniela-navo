@@ -92,6 +92,9 @@ const ESPN_ID_MAP = {
   '760483':'537401'
 };
 
+// Limpia el nombre del goleador de los sufijos de ESPN ("X Goal", "X - Volley", "X Penalty - Scored", etc.)
+function limpiarJugador(txt){ return (txt||'').split(' - ')[0].replace(/\s+(Goal|Penalty|Header|Volley)$/i,'').trim(); }
+
 // Mapa de IDs ESPN → IDs football-data.org
 
 
@@ -177,7 +180,7 @@ export default {
               .filter(e => e.scoringPlay || (e.shortText && e.shortText.includes('Goal')))
               .map(g => ({
                 minuto: g.clock?.displayValue || '',
-                jugador: (g.shortText||'').replace(' Goal','').replace(' - Header','').replace(' - Penalty','').trim(),
+                jugador: limpiarJugador(g.shortText),
                 local: String(g.team?.id) === String(p.homeId),
               }));
             const golL = partidosKV[idx].goles.filter(g=>g.local).length;
@@ -316,6 +319,7 @@ export default {
             if(idx < 0) return;
             const eraFT = partidosKV[idx].status === 'FT';
             partidosKV[idx].status = ep.status;
+            partidosKV[idx].espnId = ep.espnId; // necesario para el backfill de goles (/api/partidos/goles)
             if(ep.status === 'FT' && !eraFT && !partidosKV[idx].ftAt) partidosKV[idx].ftAt = Date.now();
             partidosKV[idx].g1 = ep.g1;
             partidosKV[idx].g2 = ep.g2;
@@ -329,7 +333,7 @@ export default {
                   .filter(e => e.scoringPlay || (e.shortText && e.shortText.includes('Goal')))
                   .map(g => ({
                     minuto: g.clock?.displayValue || '',
-                    jugador: (g.shortText||'').replace(' Goal','').replace(' - Header','').replace(' - Penalty','').trim(),
+                    jugador: limpiarJugador(g.shortText),
                     local: String(g.team?.id) === String(ep.homeId),
                   }));
                 // El marcador del scoreboard a veces va con retraso (sobre todo en autogoles).
