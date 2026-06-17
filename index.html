@@ -318,7 +318,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v6.7</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v7.0</p>
 </header>
 
 <div class="topbar">
@@ -348,7 +348,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
     <div class="chat-title">💬 Chat del grupo</div>
     <div class="chat-msgs" id="chat-msgs"><div class="chat-empty">Sé el primero en comentar...</div></div>
     <div class="chat-input-wrap" id="chat-input-wrap">
-      <input class="chat-input" id="chat-input" placeholder="Escribe algo... 🔥⚽🎯" maxlength="200" onkeydown="if(event.key==='Enter')enviarMensaje()">
+      <input class="chat-input" id="chat-input" placeholder="Escribe algo... 🔥⚽🎯" maxlength="500" onkeydown="if(event.key==='Enter')enviarMensaje()">
       <button class="chat-send" id="chat-send" onclick="enviarMensaje()">➤</button>
     </div>
     <div id="chat-login-msg" style="display:none;font-size:12px;color:#6677aa;text-align:center;padding:8px">Ingresa con tu PIN para comentar</div>
@@ -687,9 +687,17 @@ async function actualizarPartidosSiNecesario(forzar=false) {
     const ultimoFetchMs = new Date(db.partidosFetchedAt||0).getTime();
     return (ahora - ultimoFetchMs) < 60*60*1000;
   });
+  // Partido que YA arrancó por reloj pero seguimos viendo en PRE (ESPN aún no consultado):
+  // hay que consultar ya para detectarlo como LIVE.
+  const hayPartidoArrancando = db.partidos.some(p => {
+    if(p.status !== 'PRE') return false;
+    const inicio = new Date(p.fecha+'T'+(p.hora||'00:00')+':00Z').getTime();
+    const desdeInicio = ahora - inicio;
+    return desdeInicio >= 0 && desdeInicio < 3*60*60*1000; // arrancó hace <3h
+  });
 
   let intervalo;
-  if(hayLive) intervalo = 2*60*1000;          // partido en vivo: cada 2 min
+  if(hayLive || hayPartidoArrancando) intervalo = 2*60*1000;  // en vivo o recién arrancado: cada 2 min
   else if(hayPartidoProximo) intervalo = 5*60*1000;  // partido próximo: cada 5 min
   else if(hayPartidoReciente) intervalo = 5*60*1000; // partido recién terminado: cada 5 min
   else intervalo = 60*60*1000;                 // sin partido: cada 1 hora
@@ -718,8 +726,15 @@ function iniciarTimers() {
   liveTimer = setInterval(async () => {
     const hayLive = db.partidos.some(p=>p.status==='LIVE'||p.status==='HT');
     const ahora = Date.now();
+    // Partido que ya arrancó por reloj pero sigue en PRE: hay que consultar ya
+    const arrancando = db.partidos.some(p => {
+      if(p.status!=='PRE') return false;
+      const inicio = new Date(p.fecha+'T'+(p.hora||'00:00')+':00Z').getTime();
+      const d = ahora - inicio;
+      return d>=0 && d < 3*60*60*1000;
+    });
     const ultimoFetch = db.partidosFetchedAt ? new Date(db.partidosFetchedAt).getTime() : 0;
-    const intervalo = hayLive ? 2*60*1000 : 60*60*1000;
+    const intervalo = (hayLive || arrancando) ? 2*60*1000 : 60*60*1000;
     if((ahora - ultimoFetch) >= intervalo) {
       await cargarDatos();
     } else {
@@ -1985,7 +2000,7 @@ function renderChat() {
     return;
   }
 
-  msgs.innerHTML = chat.slice(-15).reverse().map(m => {
+  msgs.innerHTML = chat.slice(-50).reverse().map(m => {
     const esMio = m.uid === currentUserId || (m.uid==='admin' && currentRole==='admin');
     const part = db.participantes.find(p=>p.id===m.uid);
     const nombre = m.uid==='admin' ? '⚡ Admin' : (part?part.nombre:'?');
