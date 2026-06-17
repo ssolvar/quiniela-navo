@@ -210,7 +210,7 @@ export default {
         let chat = await kvGet(KV, 'CHAT') || [];
         if (body.accion === 'agregar' && body.mensaje) {
           if (!chat.find(m => m.id === body.mensaje.id)) {
-            chat = [...chat, body.mensaje].slice(-20);
+            chat = [...chat, body.mensaje].slice(-100);
             await kvSet(KV, 'CHAT', chat);
           }
         } else if (body.accion === 'borrar' && body.id) {
@@ -259,10 +259,16 @@ export default {
     // ==========================================
     if (path === '/api/partidos') {
       try {
-        // ESPN API — solo partidos de hoy para scores en vivo
-        const res = await fetch('https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard');
-        const data = await res.json();
-        const events = data.events || [];
+        // ESPN bucketea el scoreboard por su día (horario US), así que pedimos una
+        // ventana de días en UTC (ayer/hoy/mañana) y unimos los eventos para no
+        // perdernos partidos que su "hoy" todavía no incluye.
+        const ymd = (d) => d.getUTCFullYear() + String(d.getUTCMonth()+1).padStart(2,'0') + String(d.getUTCDate()).padStart(2,'0');
+        const baseSB = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=';
+        const dias = [-1, 0, 1].map(off => { const d = new Date(); d.setUTCDate(d.getUTCDate()+off); return ymd(d); });
+        const respuestas = await Promise.allSettled(dias.map(dia => fetch(baseSB + dia).then(r => r.json())));
+        const mapaEventos = {};
+        respuestas.forEach(r => { if(r.status==='fulfilled') (r.value.events||[]).forEach(ev => { mapaEventos[ev.id] = ev; }); });
+        const events = Object.values(mapaEventos);
         
         // Leer partidos existentes del KV
         let partidosKV = await kvGet(KV, 'partidos') || [];
