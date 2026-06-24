@@ -55,7 +55,12 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 /* RETO CARD */
 .reto-card{background:linear-gradient(135deg,#1a3a2a,#0f5c35);border-radius:14px;padding:14px 16px;margin-bottom:10px;border:1px solid rgba(255,255,255,.1)}
 .reto-match{font-size:12px;color:rgba(255,255,255,.6);margin-bottom:6px;display:flex;align-items:center;gap:6px}
-.reto-match.live{color:var(--rj)}
+.reto-match.live{color:var(--do)}
+.jugados-wrap{margin-top:12px}
+.jugados-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;background:#0d1440;border:1px solid #1a2a70;border-radius:10px;padding:11px 14px;color:#aab8e0;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s}
+.jugados-toggle:hover{background:#141e5c}
+.jugados-count{background:#1a2a70;color:var(--do);border-radius:12px;padding:2px 9px;font-size:12px;font-weight:700}
+.jugados-list{margin-top:8px}
 .reto-titulo{font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--do);letter-spacing:1px;margin-bottom:4px}
 .reto-pregunta{font-size:15px;font-weight:600;color:#fff;margin-bottom:10px}
 .reto-opciones{display:flex;gap:8px;flex-wrap:wrap}
@@ -318,7 +323,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v7.0</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v7.1</p>
 </header>
 
 <div class="topbar">
@@ -465,6 +470,8 @@ let liveTimer = null;
 let presenciaTimer = null;
 let grupoActivo = 'Fase de Grupos';
 let retoIndex = 0; // índice del reto activo en pantalla principal
+let jugadosAbierto = false; // pestaña colapsable de partidos jugados
+function toggleJugados(){ jugadosAbierto = !jugadosAbierto; renderPartidos(); }
 let premiosTemp = [];
 
 // =============================================
@@ -945,7 +952,7 @@ function renderRetoPrincipal() {
 
   // Estado del partido
   const matchLabel = isLive
-    ? `<span style="color:var(--rj)">🔴 EN VIVO ${partido.minuto?partido.minuto+"'":''}${partido.g1!==null?' · '+partido.g1+'-'+partido.g2:''}</span>`
+    ? `<span style="color:var(--do)">🔴 EN VIVO ${partido.minuto?partido.minuto+"'":''}${partido.g1!==null?' · '+partido.g1+'-'+partido.g2:''}</span>`
     : isFT
     ? `✅ Finalizado · ${partido.g1} - ${partido.g2}`
     : `🕐 ${formatFecha(partido.fecha,partido.hora)}`;
@@ -1050,7 +1057,10 @@ function renderPartidos() {
   const pc=document.getElementById('partidos-cont');
   const partidos=db.partidos.filter(p=>p.fase===grupoActivo);
   if(!partidos.length){pc.innerHTML='<div class="loading">Cargando partidos...</div>';return;}
-  pc.innerHTML=partidos.map(p=>{
+
+  const koMs = p => { const t=new Date(`${p.fecha}T${(p.hora||'00:00')}:00Z`).getTime(); return isNaN(t)?0:t; };
+
+  function cardHTML(p){
     const isFT=p.status==='FT', isLive=p.status==='LIVE', isHT=p.status==='HT';
     const cls=isFT?'ft':(isLive||isHT)?'live':'pre';
     const minLabel = p.minuto ? ` ${p.minuto}` : '';
@@ -1088,7 +1098,24 @@ function renderPartidos() {
       ${extraHtml}
       ${retoHtml}
     </div>`;
-  }).join('');
+  }
+
+  const activos = partidos.filter(p=>p.status!=='FT')
+    .sort((a,b)=> ((a.status==='PRE'?1:0)-(b.status==='PRE'?1:0)) || (koMs(a)-koMs(b)));
+  const jugados = partidos.filter(p=>p.status==='FT').sort((a,b)=> koMs(b)-koMs(a));
+
+  let html = activos.length ? activos.map(cardHTML).join('')
+    : '<div class="loading" style="color:#8899cc">No hay partidos próximos ni en vivo en esta fase</div>';
+  if(jugados.length){
+    html += `<div class="jugados-wrap">
+      <button class="jugados-toggle" onclick="toggleJugados()">
+        <span>${jugadosAbierto?'▼':'▶'} Partidos jugados</span>
+        <span class="jugados-count">${jugados.length}</span>
+      </button>
+      <div class="jugados-list" style="display:${jugadosAbierto?'block':'none'}">${jugados.map(cardHTML).join('')}</div>
+    </div>`;
+  }
+  pc.innerHTML = html;
 }
 function setFase(f,event){grupoActivo=f;document.querySelectorAll('.gtab').forEach(b=>b.classList.remove('active'));if(event&&event.target)event.target.classList.add('active');renderPartidos();}
 
