@@ -56,9 +56,10 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 .reto-card{background:linear-gradient(135deg,#1a3a2a,#0f5c35);border-radius:14px;padding:14px 16px;margin-bottom:10px;border:1px solid rgba(255,255,255,.1)}
 .reto-match{font-size:12px;color:rgba(255,255,255,.6);margin-bottom:6px;display:flex;align-items:center;gap:6px}
 .reto-match.live{color:var(--do)}
-.jugados-wrap{margin-top:12px}
-.jugados-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;background:#0d1440;border:1px solid #1a2a70;border-radius:10px;padding:11px 14px;color:#aab8e0;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s}
+.jugados-wrap{margin-top:12px;margin-bottom:12px}
+.jugados-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;background:#0d1440;border:1px solid #1a2a70;border-radius:10px;padding:11px 14px;color:#aab8e0;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s;animation:jugadosPulse 1.7s ease-in-out infinite}
 .jugados-toggle:hover{background:#141e5c}
+@keyframes jugadosPulse{0%,100%{box-shadow:0 0 0 rgba(201,162,39,0);border-color:#1a2a70}50%{box-shadow:0 0 14px rgba(201,162,39,.55);border-color:var(--do);color:var(--dos)}}
 .jugados-count{background:#1a2a70;color:var(--do);border-radius:12px;padding:2px 9px;font-size:12px;font-weight:700}
 .jugados-list{margin-top:8px}
 .reto-titulo{font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--do);letter-spacing:1px;margin-bottom:4px}
@@ -323,7 +324,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v7.1</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v7.2</p>
 </header>
 
 <div class="topbar">
@@ -1104,8 +1105,7 @@ function renderPartidos() {
     .sort((a,b)=> ((a.status==='PRE'?1:0)-(b.status==='PRE'?1:0)) || (koMs(a)-koMs(b)));
   const jugados = partidos.filter(p=>p.status==='FT').sort((a,b)=> koMs(b)-koMs(a));
 
-  let html = activos.length ? activos.map(cardHTML).join('')
-    : '<div class="loading" style="color:#8899cc">No hay partidos próximos ni en vivo en esta fase</div>';
+  let html = '';
   if(jugados.length){
     html += `<div class="jugados-wrap">
       <button class="jugados-toggle" onclick="toggleJugados()">
@@ -1115,6 +1115,8 @@ function renderPartidos() {
       <div class="jugados-list" style="display:${jugadosAbierto?'block':'none'}">${jugados.map(cardHTML).join('')}</div>
     </div>`;
   }
+  html += activos.length ? activos.map(cardHTML).join('')
+    : '<div class="loading" style="color:#8899cc">No hay partidos próximos ni en vivo en esta fase</div>';
   pc.innerHTML = html;
 }
 function setFase(f,event){grupoActivo=f;document.querySelectorAll('.gtab').forEach(b=>b.classList.remove('active'));if(event&&event.target)event.target.classList.add('active');renderPartidos();}
