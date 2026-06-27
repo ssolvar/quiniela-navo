@@ -324,7 +324,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v7.4</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v7.5</p>
 </header>
 
 <div class="topbar">
@@ -434,8 +434,6 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 // =============================================
 // CONFIG
 // =============================================
-const FOOTBALL_KEY = '9ffbbd9890b24d43a0c2d5667a0bfbd9';
-const FOOTBALL_URL = 'https://api.football-data.org/v4/competitions/WC/matches?season=2026';
 const PIN_ADMIN_DEFAULT = '1234';
 
 // =============================================
@@ -667,20 +665,6 @@ async function precargarTodo() {
 // =============================================
 // FOOTBALL API
 // =============================================
-function normPartido(m) {
-  const ft=(m.score||{}).fullTime||{};
-  const fases={GROUP_STAGE:'Fase de Grupos',LAST_32:'Round of 32',ROUND_OF_32:'Round of 32',LAST_16:'Octavos de Final',ROUND_OF_16:'Octavos de Final',QUARTER_FINALS:'Cuartos de Final',SEMI_FINALS:'Semifinal',THIRD_PLACE:'Tercer Lugar',FINAL:'Final'};
-  const status={SCHEDULED:'PRE',TIMED:'PRE',IN_PLAY:'LIVE',PAUSED:'HT',FINISHED:'FT',AWARDED:'FT'};
-  return {
-    id:String(m.id), local:m.homeTeam?.name||'TBD', visitante:m.awayTeam?.name||'TBD',
-    localCod:m.homeTeam?.tla||'', visitanteCod:m.awayTeam?.tla||'',
-    fecha:(m.utcDate||'').slice(0,10), hora:(m.utcDate||'').slice(11,16),
-    fase:fases[m.stage]||'Fase de Grupos', grupo:m.group?m.group.replace('GROUP_','Grupo '):'',
-    estadio:m.venue||'', status:status[m.status]||'PRE',
-    g1:ft.home??null, g2:ft.away??null, minuto:m.minute||null,
-  };
-}
-
 async function actualizarPartidosSiNecesario(forzar=false) {
   const ahora = Date.now();
   const ultimoFetch = db.partidosFetchedAt ? new Date(db.partidosFetchedAt).getTime() : 0;
@@ -1735,16 +1719,6 @@ function showTab(t){
 }
 
 // =============================================
-// CONFIG APIS EXTERNAS
-// =============================================
-const NEWS_API_KEY = 'dd7695a891a046fabb270718eb220064';
-const NEWS_URL = 'https://newsapi.org/v2/everything?q=%22FIFA+World+Cup+2026%22&language=es&sortBy=publishedAt&pageSize=10&apiKey='+NEWS_API_KEY;
-const STANDINGS_URL = 'https://api.football-data.org/v4/competitions/WC/standings?season=2026';
-const SCORERS_URL   = 'https://api.football-data.org/v4/competitions/WC/scorers?season=2026&limit=10';
-
-// Cache para no repetir llamadas
-
-// =============================================
 // MUNDIAL — FETCH Y RENDER
 // =============================================
 async function cargarMundial() {
@@ -2054,13 +2028,6 @@ function renderChat() {
   }).join('');
 }
 
-function chatGuardarLocal(msgs) {
-  try { localStorage.setItem('q_chat', JSON.stringify(msgs)); } catch(e) {}
-}
-function chatLeerLocal() {
-  try { return JSON.parse(localStorage.getItem('q_chat')||'[]'); } catch(e) { return []; }
-}
-
 async function enviarMensaje() {
   const inp = document.getElementById('chat-input');
   if(!inp) return;
@@ -2085,7 +2052,6 @@ async function enviarMensaje() {
     });
     const data = await res.json();
     db.chat = data.chat || db.chat;
-    chatGuardarLocal(db.chat);
     renderChat();
   } catch(e) {
     console.error('Error enviando mensaje:', e);
@@ -2103,7 +2069,6 @@ async function borrarMensaje(id) {
     });
     const data = await res.json();
     db.chat = data.chat || db.chat;
-    chatGuardarLocal(db.chat);
     renderChat();
     toast('Mensaje eliminado');
   } catch(e) { toast('❌ Error al borrar'); }
