@@ -141,7 +141,7 @@ const TEAM_MAP = {
 
 function normPartido(m) {
   const ft = (m.score||{}).fullTime||{};
-  const fases = {GROUP_STAGE:'Fase de Grupos',ROUND_OF_32:'Round of 32',ROUND_OF_16:'Octavos de Final',QUARTER_FINALS:'Cuartos de Final',SEMI_FINALS:'Semifinal',THIRD_PLACE:'Tercer Lugar',FINAL:'Final'};
+  const fases = {GROUP_STAGE:'Fase de Grupos',LAST_32:'Round of 32',ROUND_OF_32:'Round of 32',LAST_16:'Octavos de Final',ROUND_OF_16:'Octavos de Final',QUARTER_FINALS:'Cuartos de Final',SEMI_FINALS:'Semifinal',THIRD_PLACE:'Tercer Lugar',FINAL:'Final'};
   const status = {SCHEDULED:'PRE',TIMED:'PRE',IN_PLAY:'LIVE',PAUSED:'HT',FINISHED:'FT',AWARDED:'FT'};
   return {
     id:String(m.id), local:m.homeTeam?.name||'TBD', visitante:m.awayTeam?.name||'TBD',
@@ -406,6 +406,47 @@ export default {
         return new Response(JSON.stringify(data), { headers: {...CORS,'Cache-Control':'public, max-age=120'} });
       } catch(e) {
         return new Response(JSON.stringify({matches:[],error:e.message}), { headers: CORS });
+      }
+    }
+
+    if (path === '/api/sync-fixtures') {
+      try {
+        const res = await fetch(`${FOOTBALL_BASE}/competitions/WC/matches?season=2026`, { headers: {'X-Auth-Token':FOOTBALL_KEY} });
+        const data = await res.json();
+        const fdMatches = data.matches || [];
+        if(!fdMatches.length) return new Response(JSON.stringify({ok:false,error:'sin partidos'}), { headers: CORS });
+        let partidosKV = await kvGet(KV, 'partidos') || [];
+        const porId = {};
+        partidosKV.forEach(p => { porId[p.id] = p; });
+        let nuevos = 0, actualizados = 0;
+        fdMatches.forEach(m => {
+          const norm = normPartido(m);
+          const ex = porId[norm.id];
+          if (ex) {
+            // football-data manda en el "fixture" (fase, equipos, fecha, grupo);
+            // ESPN/KV manda en lo "en vivo" (status, score, goles, tarjetas...) → se preservan
+            ex.fase = norm.fase;
+            ex.grupo = norm.grupo;
+            ex.fecha = norm.fecha;
+            ex.hora = norm.hora;
+            ex.estadio = norm.estadio;
+            if (norm.local !== 'TBD') ex.local = norm.local;
+            if (norm.visitante !== 'TBD') ex.visitante = norm.visitante;
+            if (norm.localCod) ex.localCod = norm.localCod;
+            if (norm.visitanteCod) ex.visitanteCod = norm.visitanteCod;
+            // si el partido aún no se jugó, sincronizar también status/score desde football-data
+            if (ex.status !== 'FT' && ex.status !== 'LIVE' && ex.status !== 'HT') {
+              ex.status = norm.status; ex.g1 = norm.g1; ex.g2 = norm.g2;
+            }
+            actualizados++;
+          } else {
+            partidosKV.push(norm); nuevos++;
+          }
+        });
+        await kvSet(KV, 'partidos', partidosKV);
+        return new Response(JSON.stringify({ ok:true, nuevos, actualizados, total: partidosKV.length }), { headers: CORS });
+      } catch(e) {
+        return new Response(JSON.stringify({ ok:false, error:e.message }), { headers: CORS });
       }
     }
 
