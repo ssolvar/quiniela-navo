@@ -324,7 +324,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v7.2</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v7.4</p>
 </header>
 
 <div class="topbar">
@@ -469,6 +469,7 @@ let currentUserId = null;
 let pinBuffer = '';
 let liveTimer = null;
 let presenciaTimer = null;
+let ultimoSyncFixtures = Date.now(); // último sync de fixtures (fases + equipos eliminatoria)
 let grupoActivo = 'Fase de Grupos';
 let retoIndex = 0; // índice del reto activo en pantalla principal
 let jugadosAbierto = false; // pestaña colapsable de partidos jugados
@@ -656,6 +657,7 @@ async function guardarCampos(campos) {
 async function precargarTodo() {
   setSyncStatus('loading');
   try {
+    await fetch('/api/sync-fixtures').catch(()=>{}); // corrige fases y trae equipos de eliminatoria (football-data)
     await cargarDatos(true);    // fuerza /api/partidos + /api/db + backfill de goles
     await cargarMundial();       // renderiza goleadores y standings (desde db.partidos)
     setSyncStatus('ok');
@@ -667,7 +669,7 @@ async function precargarTodo() {
 // =============================================
 function normPartido(m) {
   const ft=(m.score||{}).fullTime||{};
-  const fases={GROUP_STAGE:'Fase de Grupos',ROUND_OF_32:'Round of 32',ROUND_OF_16:'Octavos de Final',QUARTER_FINALS:'Cuartos de Final',SEMI_FINALS:'Semifinal',THIRD_PLACE:'Tercer Lugar',FINAL:'Final'};
+  const fases={GROUP_STAGE:'Fase de Grupos',LAST_32:'Round of 32',ROUND_OF_32:'Round of 32',LAST_16:'Octavos de Final',ROUND_OF_16:'Octavos de Final',QUARTER_FINALS:'Cuartos de Final',SEMI_FINALS:'Semifinal',THIRD_PLACE:'Tercer Lugar',FINAL:'Final'};
   const status={SCHEDULED:'PRE',TIMED:'PRE',IN_PLAY:'LIVE',PAUSED:'HT',FINISHED:'FT',AWARDED:'FT'};
   return {
     id:String(m.id), local:m.homeTeam?.name||'TBD', visitante:m.awayTeam?.name||'TBD',
@@ -734,6 +736,11 @@ function iniciarTimers() {
   liveTimer = setInterval(async () => {
     const hayLive = db.partidos.some(p=>p.status==='LIVE'||p.status==='HT');
     const ahora = Date.now();
+    // Re-sincronizar fixtures (corrige fases y trae equipos de eliminatoria) cada 15 min, sin recargar
+    if(ahora - ultimoSyncFixtures >= 15*60*1000) {
+      ultimoSyncFixtures = ahora;
+      try { await fetch('/api/sync-fixtures'); await cargarDatos(true); return; } catch(e) {}
+    }
     // Partido que ya arrancó por reloj pero sigue en PRE: hay que consultar ya
     const arrancando = db.partidos.some(p => {
       if(p.status!=='PRE') return false;
