@@ -259,16 +259,14 @@ export default {
     // ==========================================
     if (path === '/api/partidos') {
       try {
-        // ESPN bucketea el scoreboard por su día (horario US), así que pedimos una
-        // ventana de días en UTC (ayer/hoy/mañana) y unimos los eventos para no
-        // perdernos partidos que su "hoy" todavía no incluye.
+        // Pedimos a ESPN un rango amplio en UTC (ayer → +28 días) en una sola llamada,
+        // así capturamos los marcadores en vivo Y todo el cuadro de eliminatorias.
         const ymd = (d) => d.getUTCFullYear() + String(d.getUTCMonth()+1).padStart(2,'0') + String(d.getUTCDate()).padStart(2,'0');
         const baseSB = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=';
-        const dias = [-1, 0, 1].map(off => { const d = new Date(); d.setUTCDate(d.getUTCDate()+off); return ymd(d); });
-        const respuestas = await Promise.allSettled(dias.map(dia => fetch(baseSB + dia).then(r => r.json())));
-        const mapaEventos = {};
-        respuestas.forEach(r => { if(r.status==='fulfilled') (r.value.events||[]).forEach(ev => { mapaEventos[ev.id] = ev; }); });
-        const events = Object.values(mapaEventos);
+        const desde = new Date(); desde.setUTCDate(desde.getUTCDate()-1);
+        const hasta = new Date(); hasta.setUTCDate(hasta.getUTCDate()+28);
+        const data = await fetch(baseSB + ymd(desde) + '-' + ymd(hasta)).then(r => r.json()).catch(()=>({events:[]}));
+        const events = data.events || [];
         
         // Leer partidos existentes del KV
         let partidosKV = await kvGet(KV, 'partidos') || [];
@@ -355,6 +353,22 @@ export default {
               } catch(e) {}
             }
           }));
+
+          // 2ª pasada: rellenar EQUIPOS de cruces de eliminatoria desde ESPN (más rápido
+          // y completo que football-data), emparejando por fecha+hora (calendario oficial).
+          // Se ignoran los placeholders de ESPN tipo "Group L Winner" o "Third Place...".
+          const esReal = n => n && n !== 'TBD' && !/winner|place|group\s+[a-l]\b|tba|tbd/i.test(n);
+          espnPartidos.forEach(ep => {
+            if(partidosKV.some(p => p.id === ep.id)) return; // ya emparejado por id (grupos)
+            const idx = partidosKV.findIndex(p =>
+              p.fase && p.fase !== 'Fase de Grupos' &&
+              p.fecha === ep.fecha && (p.hora||'').slice(0,2) === (ep.hora||'').slice(0,2));
+            if(idx < 0) return;
+            partidosKV[idx].espnId = ep.espnId;
+            if(esReal(ep.local))     { partidosKV[idx].local = ep.local; partidosKV[idx].localCod = ep.localCod; partidosKV[idx].homeId = ep.homeId; }
+            if(esReal(ep.visitante)) { partidosKV[idx].visitante = ep.visitante; partidosKV[idx].visitanteCod = ep.visitanteCod; partidosKV[idx].awayId = ep.awayId; }
+            if(ep.status !== 'PRE') { partidosKV[idx].status = ep.status; partidosKV[idx].g1 = ep.g1; partidosKV[idx].g2 = ep.g2; }
+          });
         }
 
         // Solo guardar si el KV tiene partidos (no sobreescribir con menos)
