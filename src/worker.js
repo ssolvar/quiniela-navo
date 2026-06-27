@@ -357,7 +357,7 @@ export default {
           // 2ª pasada: rellenar EQUIPOS de cruces de eliminatoria desde ESPN (más rápido
           // y completo que football-data), emparejando por fecha+hora (calendario oficial).
           // Se ignoran los placeholders de ESPN tipo "Group L Winner" o "Third Place...".
-          const esReal = n => n && n !== 'TBD' && !/winner|place|group\s+[a-l]\b|tba|tbd/i.test(n);
+          const esReal = n => n && n !== 'TBD' && !/winner|loser|place|group\s|round of|semifinal|\bfinal\b|quarter|cuartos|octavos|tercer|third|runner|\btba\b|\btbd\b/i.test(n);
           espnPartidos.forEach(ep => {
             if(partidosKV.some(p => p.id === ep.id)) return; // ya emparejado por id (grupos)
             const idx = partidosKV.findIndex(p =>
@@ -365,8 +365,11 @@ export default {
               p.fecha === ep.fecha && (p.hora||'').slice(0,2) === (ep.hora||'').slice(0,2));
             if(idx < 0) return;
             partidosKV[idx].espnId = ep.espnId;
-            if(esReal(ep.local))     { partidosKV[idx].local = ep.local; partidosKV[idx].localCod = ep.localCod; partidosKV[idx].homeId = ep.homeId; }
+            // local: usar equipo real de ESPN; si ESPN trae placeholder y el actual tampoco es real, normalizar a TBD
+            if(esReal(ep.local)) { partidosKV[idx].local = ep.local; partidosKV[idx].localCod = ep.localCod; partidosKV[idx].homeId = ep.homeId; }
+            else if(!esReal(partidosKV[idx].local)) partidosKV[idx].local = 'TBD';
             if(esReal(ep.visitante)) { partidosKV[idx].visitante = ep.visitante; partidosKV[idx].visitanteCod = ep.visitanteCod; partidosKV[idx].awayId = ep.awayId; }
+            else if(!esReal(partidosKV[idx].visitante)) partidosKV[idx].visitante = 'TBD';
             if(ep.status !== 'PRE') { partidosKV[idx].status = ep.status; partidosKV[idx].g1 = ep.g1; partidosKV[idx].g2 = ep.g2; }
           });
         }
