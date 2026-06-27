@@ -399,6 +399,16 @@ export default {
       }
     }
 
+    if (path === '/api/raw-matches') {
+      try {
+        const res = await fetch(`${FOOTBALL_BASE}/competitions/WC/matches?season=2026`, { headers: {'X-Auth-Token':FOOTBALL_KEY} });
+        const data = await res.json();
+        return new Response(JSON.stringify(data), { headers: {...CORS,'Cache-Control':'public, max-age=120'} });
+      } catch(e) {
+        return new Response(JSON.stringify({matches:[],error:e.message}), { headers: CORS });
+      }
+    }
+
     // ==========================================
     // HTML — servir app
     // ==========================================
