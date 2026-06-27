@@ -324,7 +324,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v7.5</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v7.6</p>
 </header>
 
 <div class="topbar">
@@ -1092,8 +1092,7 @@ function renderPartidos() {
     </div>`;
   }
 
-  const activos = partidos.filter(p=>p.status!=='FT')
-    .sort((a,b)=> ((a.status==='PRE'?1:0)-(b.status==='PRE'?1:0)) || (koMs(a)-koMs(b)));
+  const activos = partidos.filter(p=>p.status!=='FT').sort((a,b)=> koMs(a)-koMs(b));
   const jugados = partidos.filter(p=>p.status==='FT').sort((a,b)=> koMs(b)-koMs(a));
 
   let html = '';
@@ -1125,7 +1124,7 @@ function renderBracket() {
     return `<div class="bracket-round">
       <div class="bracket-round-title">${getFaseIcon(ronda)} ${ronda}</div>
       <div class="bracket-matches">${ps.map(p=>{
-        const lTBD=!p.local||p.local==='TBD', vTBD=!p.visitante||p.visitante==='TBD';
+        const lTBD=!esEquipoReal(p.local), vTBD=!esEquipoReal(p.visitante);
         const lWin=p.status==='FT'&&p.g1>p.g2, vWin=p.status==='FT'&&p.g2>p.g1;
         return `<div class="bracket-match">
           <div class="bracket-team ${lWin?'winner':''} ${lTBD?'tbd':''}">
@@ -1147,7 +1146,7 @@ function renderBracket() {
 function renderPredicciones() {
   const fc=document.getElementById('pred-form-cont');
   const miId = currentUserId;
-  const disponibles=db.partidos.filter(p=>p.status==='PRE'&&p.local!=='TBD'&&p.visitante!=='TBD');
+  const disponibles=db.partidos.filter(p=>p.status==='PRE'&&esEquipoReal(p.local)&&esEquipoReal(p.visitante));
   const porFase={};
   disponibles.forEach(p=>{const f=p.fase;if(!porFase[f])porFase[f]=[];porFase[f].push(p);});
   const partidoOptions=Object.entries(porFase).map(([f,ps])=>
@@ -1258,7 +1257,7 @@ function renderCobertura() {
   if(!db.participantes.length){c.innerHTML='<div class="empty">Agrega participantes primero</div>';return;}
   const ahora=Date.now();
   const visibles=db.partidos.filter(p=>{
-    if(p.local==='TBD'||p.visitante==='TBD') return false;
+    if(!esEquipoReal(p.local)||!esEquipoReal(p.visitante)) return false;
     if(p.status==='PRE'||p.status==='LIVE'||p.status==='HT') return true; // próximos y en vivo siempre
     if(p.status==='FT'){
       // mostrar hasta 1 hora después de terminar
@@ -1705,6 +1704,12 @@ function formatFecha(fecha,hora){
   catch{return fecha;}
 }
 function getFaseIcon(f){return{' Fase de Grupos':'⚽','Round of 32':'⚡','Octavos de Final':'🔥','Cuartos de Final':'💥','Semifinal':'🌟','Final':'🏆','Tercer Lugar':'🥉'}[f]||'⚽';}
+// Un equipo es "real" si no es TBD ni un placeholder de ESPN (Semifinal, Winner, Third Place, etc.)
+function esEquipoReal(n){
+  if(!n || n==='TBD') return false;
+  return !/winner|loser|place|group\s|round of|semifinal|\bfinal\b|quarter|cuartos|octavos|tercer|third|runner|ganador|perdedor|por definir|\btbd\b|\btba\b/i.test(n);
+}
+
 function banderas(cod){
   const f={'MEX':'🇲🇽','USA':'🇺🇸','CAN':'🇨🇦','BRA':'🇧🇷','ARG':'🇦🇷','ESP':'🇪🇸','FRA':'🇫🇷','GER':'🇩🇪','ENG':'🇬🇧','POR':'🇵🇹','NED':'🇳🇱','BEL':'🇧🇪','URU':'🇺🇾','COL':'🇨🇴','ECU':'🇪🇨','PER':'🇵🇾','PAR':'🇵🇾','JAP':'🇯🇵','KOR':'🇰🇷','AUS':'🇦🇺','MAR':'🇲🇦','SEN':'🇸🇳','EGY':'🇪🇬','NGA':'🇳🇬','GHA':'🇬🇭','CIV':'🇨🇮','TUN':'🇹🇳','CRC':'🇨🇷','PAN':'🇵🇦','SUI':'🇨🇭','CRO':'🇭🇷','SRB':'🇷🇸','POL':'🇵🇱','CZE':'🇨🇿','TUR':'🇹🇷','IRN':'🇮🇷','SAU':'🇸🇦','QAT':'🇶🇦','NOR':'🇳🇴','SWE':'🇸🇪','SCO':'🏴󠁧󠁢󠁳󠁣󠁴󠁿','RSA':'🇿🇦','NZL':'🇳🇿','SLO':'🇸🇮','JOR':'🇯🇴','ALG':'🇩🇿','CPV':'🇨🇻','HTI':'🇭🇹','CUW':'🇨🇼','IRQ':'🇮🇶','UZB':'🇺🇿','COD':'🇨🇩','BIH':'🇧🇦'};
   return f[cod]||'🏳️';
