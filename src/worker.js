@@ -390,32 +390,6 @@ export default {
       }
     }
 
-    // ==========================================
-    // STANDINGS
-    // ==========================================
-    if (path === '/api/standings') {
-      try {
-        const res = await fetch(`${FOOTBALL_BASE}/competitions/WC/standings?season=2026`, { headers: {'X-Auth-Token':FOOTBALL_KEY} });
-        const data = await res.json();
-        return new Response(JSON.stringify(data), { headers: {...CORS,'Cache-Control':'public, max-age=300'} });
-      } catch(e) {
-        return new Response(JSON.stringify({standings:[],error:e.message}), { headers: CORS });
-      }
-    }
-
-    // ==========================================
-    // GOLEADORES
-    // ==========================================
-    if (path === '/api/scorers') {
-      try {
-        const res = await fetch(`${FOOTBALL_BASE}/competitions/WC/scorers?season=2026&limit=10`, { headers: {'X-Auth-Token':FOOTBALL_KEY} });
-        const data = await res.json();
-        return new Response(JSON.stringify(data), { headers: {...CORS,'Cache-Control':'public, max-age=120'} });
-      } catch(e) {
-        return new Response(JSON.stringify({scorers:[],error:e.message}), { headers: CORS });
-      }
-    }
-
     if (path === '/api/raw-matches') {
       try {
         const res = await fetch(`${FOOTBALL_BASE}/competitions/WC/matches?season=2026`, { headers: {'X-Auth-Token':FOOTBALL_KEY} });
@@ -426,6 +400,9 @@ export default {
       }
     }
 
+    // RESPALDO (no la usa la app): re-siembra/re-sincroniza el esqueleto de partidos
+    // desde football-data. Solo para emergencia si se pierde el KV. football-data NO
+    // se llama en el flujo normal — toda la data en vivo viene de ESPN.
     if (path === '/api/sync-fixtures') {
       try {
         const res = await fetch(`${FOOTBALL_BASE}/competitions/WC/matches?season=2026`, { headers: {'X-Auth-Token':FOOTBALL_KEY} });
