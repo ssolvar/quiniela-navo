@@ -324,7 +324,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v7.6</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v7.8</p>
 </header>
 
 <div class="topbar">
@@ -467,8 +467,8 @@ let currentUserId = null;
 let pinBuffer = '';
 let liveTimer = null;
 let presenciaTimer = null;
-let ultimoSyncFixtures = Date.now(); // último sync de fixtures (fases + equipos eliminatoria)
 let grupoActivo = 'Fase de Grupos';
+let faseManual = false; // true cuando el usuario elige una fase manualmente (deja de auto-avanzar)
 let retoIndex = 0; // índice del reto activo en pantalla principal
 let jugadosAbierto = false; // pestaña colapsable de partidos jugados
 function toggleJugados(){ jugadosAbierto = !jugadosAbierto; renderPartidos(); }
@@ -608,6 +608,7 @@ async function cargarDatos(forzarPartidos=false) {
     preservarLocal(fresh, prev); // no pisar campos escritos localmente hace <60s (KV eventual)
     db = fresh;
     db.chat = chatGuardado; // siempre preservar chat
+    renderChat(); // pintar el chat de inmediato, sin esperar la actualización de partidos (ESPN)
     // Actualizar partidos si hace >1h o si hay partido en vivo (cada 2 min)
     await actualizarPartidosSiNecesario(forzarPartidos);
     // Rellenar goles de partidos terminados (para que la tabla de goleadores sea correcta)
@@ -655,9 +656,8 @@ async function guardarCampos(campos) {
 async function precargarTodo() {
   setSyncStatus('loading');
   try {
-    await fetch('/api/sync-fixtures').catch(()=>{}); // corrige fases y trae equipos de eliminatoria (football-data)
-    await cargarDatos(true);    // fuerza /api/partidos + /api/db + backfill de goles
-    await cargarMundial();       // renderiza goleadores y standings (desde db.partidos)
+    await cargarDatos(true);    // datos + chat PRIMERO (rápido)
+    await cargarMundial();       // goleadores y standings (desde db.partidos)
     setSyncStatus('ok');
   } catch(e) { setSyncStatus('error'); console.error('Precarga inicial:', e); }
 }
@@ -720,11 +720,6 @@ function iniciarTimers() {
   liveTimer = setInterval(async () => {
     const hayLive = db.partidos.some(p=>p.status==='LIVE'||p.status==='HT');
     const ahora = Date.now();
-    // Re-sincronizar fixtures (corrige fases y trae equipos de eliminatoria) cada 15 min, sin recargar
-    if(ahora - ultimoSyncFixtures >= 15*60*1000) {
-      ultimoSyncFixtures = ahora;
-      try { await fetch('/api/sync-fixtures'); await cargarDatos(true); return; } catch(e) {}
-    }
     // Partido que ya arrancó por reloj pero sigue en PRE: hay que consultar ya
     const arrancando = db.partidos.some(p => {
       if(p.status!=='PRE') return false;
@@ -1043,6 +1038,11 @@ function renderTabla() {
 function renderPartidos() {
   const fases=['Fase de Grupos','Round of 32','Octavos de Final','Cuartos de Final','Semifinal','Tercer Lugar','Final'];
   const fasesConPartidos=fases.filter(f=>db.partidos.some(p=>p.fase===f));
+  // Fase activa: la primera (en orden) con algún partido sin terminar. Si todo terminó, la última.
+  if(!faseManual && fasesConPartidos.length){
+    grupoActivo = fasesConPartidos.find(f=>db.partidos.some(p=>p.fase===f && p.status!=='FT'))
+                  || fasesConPartidos[fasesConPartidos.length-1];
+  }
   const ft=document.getElementById('fase-tabs');
   ft.innerHTML=fasesConPartidos.map(f=>`<button class="gtab ${f===grupoActivo?'active':''}" onclick="setFase('${f}',event)">${getFaseIcon(f)} ${f}</button>`).join('');
   if(!fasesConPartidos.includes(grupoActivo)&&fasesConPartidos.length) grupoActivo=fasesConPartidos[0];
@@ -1109,7 +1109,7 @@ function renderPartidos() {
     : '<div class="loading" style="color:#8899cc">No hay partidos próximos ni en vivo en esta fase</div>';
   pc.innerHTML = html;
 }
-function setFase(f,event){grupoActivo=f;document.querySelectorAll('.gtab').forEach(b=>b.classList.remove('active'));if(event&&event.target)event.target.classList.add('active');renderPartidos();}
+function setFase(f,event){faseManual=true;grupoActivo=f;document.querySelectorAll('.gtab').forEach(b=>b.classList.remove('active'));if(event&&event.target)event.target.classList.add('active');renderPartidos();}
 
 // =============================================
 // RENDER — BRACKET
