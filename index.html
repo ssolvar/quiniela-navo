@@ -104,9 +104,9 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 .ball-fail{background:#e24b4a;border-color:#e24b4a}
 .ball-empty{background:transparent;border-color:#2a3a80}
 .gk-body,.ball-body{transition:transform 1s ease-out}
-.gk-dive-l{transform:translate(-60px,8px) rotate(-55deg)}
-.gk-dive-r{transform:translate(60px,8px) rotate(55deg)}
-.gk-stay{transform:translate(0,-4px) scale(1.06)}
+.gk-dive-l{transform:translate(-45px,4px)}
+.gk-dive-r{transform:translate(45px,4px)}
+.gk-stay{transform:translate(0,-4px) scale(1.04)}
 .ball-go-l{transform:translate(-92px,-30px) scale(.55)}
 .ball-go-c{transform:translate(0,-35px) scale(.55)}
 .ball-go-r{transform:translate(92px,-30px) scale(.55)}
@@ -374,7 +374,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v9.4</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v9.5</p>
 </header>
 
 <div class="topbar">
@@ -2337,6 +2337,11 @@ async function renderPenalBanner() {
 function svgCancha(modo, gkClass, ballClass){
   // modo: 'tirar' o 'atajar' — solo cambia colorcito de zonas
   const ballUrl = 'https://raw.githubusercontent.com/ssolvar/quiniela-navo/main/img/balon.png';
+  const baseImg = 'https://raw.githubusercontent.com/ssolvar/quiniela-navo/main/img';
+  // Elegir la imagen del portero según hacia dónde se tira
+  let gkUrl = baseImg + '/centro.png';
+  if(gkClass==='gk-dive-l') gkUrl = baseImg + '/izquierda.png';
+  else if(gkClass==='gk-dive-r') gkUrl = baseImg + '/derecha.png';
   return `<svg class="cancha" viewBox="0 0 300 170" preserveAspectRatio="xMidYMid meet">
     <rect x="0" y="0" width="300" height="170" fill="#0d3b1a"/>
     <ellipse cx="150" cy="162" rx="160" ry="22" fill="#0f4a22"/>
@@ -2346,13 +2351,7 @@ function svgCancha(modo, gkClass, ballClass){
       ${[46,60,74,88,102].map(y=>`<line x1="42" y1="${y}" x2="258" y2="${y}"/>`).join('')}
     </g>
     <g class="gk-body ${gkClass||''}" style="transform-origin:150px 88px">
-      <ellipse cx="150" cy="106" rx="14" ry="3.5" fill="#000" opacity="0.22"/>
-      <circle cx="150" cy="82" r="7.5" fill="#f1c27d"/>
-      <rect x="141" y="71" width="18" height="6" rx="3" fill="#c9a227"/>
-      <path d="M134 110 Q138 90 150 88 Q162 90 166 110 Z" fill="#1d9e75"/>
-      <rect x="123" y="91" width="14" height="6" rx="3" fill="#1d9e75" transform="rotate(-32 130 94)"/>
-      <rect x="163" y="91" width="14" height="6" rx="3" fill="#1d9e75" transform="rotate(32 170 94)"/>
-      <rect x="143" y="110" width="14" height="3" fill="#0a0e27"/>
+      <image href="${gkUrl}" x="110" y="46" width="80" height="80" />
     </g>
     <g class="ball-body ${ballClass||''}" style="transform-origin:150px 138px">
       <image href="${ballUrl}" x="138" y="126" width="24" height="24" />
