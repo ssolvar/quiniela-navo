@@ -356,7 +356,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v8.1</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v8.2</p>
 </header>
 
 <div class="topbar">
@@ -2099,11 +2099,13 @@ async function refrescarPenalesFresh() {
   } catch(e) {}
 }
 
-function renderPenalBanner() {
+async function renderPenalBanner() {
   const el = document.getElementById('penal-banner');
   if(!el) return;
   const yo = getMiNombre();
   if(!yo || !currentUserId) { el.style.display='none'; return; }
+  // Refrescar penales del KV ANTES de decidir qué mostrar (evita el flash tirar↔atajar)
+  await refrescarPenalesFresh();
   const { debeAtajar, otrosPendientes } = penalesEstado();
   const participantes = (db.participantes||[]).filter(p=>p.nombre!==yo);
   const puedeTirarA = participantes.filter(p=>!otrosPendientes.includes(p.nombre));
@@ -2117,7 +2119,7 @@ function renderPenalBanner() {
     el.style.display='block';
     el.innerHTML = `<button class="pban" onclick="showTab('juego')">
       <span class="pban-ico">⚽</span>
-      <span class="pban-tx"><b>Te toca tirar un penal</b><small>${puedeTirarA.length} ${puedeTirarA.length===1?'rival disponible':'rivales disponibles'}</small></span>
+      <span class="pban-tx"><b>Tirá un penal</b><small>${puedeTirarA.length} ${puedeTirarA.length===1?'rival disponible':'rivales disponibles'}</small></span>
       <span class="pban-arrow">›</span></button>`;
   } else {
     el.style.display='none';
@@ -2150,10 +2152,12 @@ function svgCancha(modo, gkClass, ballClass){
   </svg>`;
 }
 
-function renderJuego() {
+async function renderJuego() {
   const c = document.getElementById('juego-cont');
   if(!c) return;
   if(!currentUserId) { c.innerHTML='<div style="text-align:center;padding:20px;color:#8899cc;font-size:13px">Ingresa con tu PIN para jugar</div>'; renderPenalRanking(); return; }
+  // Asegurar que el estado de penales esté al día antes de pintar (regla: 1 tiro por rival pendiente)
+  await refrescarPenalesFresh();
   const yo = getMiNombre();
   const { debeAtajar, otrosPendientes } = penalesEstado();
   const rachas = calcularRachas();
@@ -2207,6 +2211,7 @@ async function tirarPenal(){
   await guardarCampos({ penales: lista });
   toast('⚽ ¡Penal enviado a '+penalSel.rival+'!');
   penalSel = { zona:null, rival:null };
+  await refrescarPenalesFresh();
   renderJuego(); renderPenalBanner();
 }
 
@@ -2228,6 +2233,7 @@ async function atajarPenal(idPenal){
     if(p.resultado==='atajado') toast('🧤 ¡Atajaste! Te toca tirarle a '+p.de);
     else toast('⚽ Goool de '+p.de+'. Devolvele el tiro');
     penalSel = { zona:null, rival:null };
+    await refrescarPenalesFresh();
     renderJuego(); renderPenalBanner();
   }, 700);
 }
