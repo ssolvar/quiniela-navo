@@ -374,7 +374,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v10.2</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v10.3</p>
 </header>
 
 <div class="topbar">
@@ -2563,13 +2563,13 @@ async function atajarPenal(idPenal){
   if(idx<0) return;
   const p = {...lista[idx]};
   p.zonaAtajada = penalSel.zona;
-  // Normalizar zonas a string limpio antes de comparar (defensa contra valores raros)
-  const zT = String(p.zonaTiro||'').trim().toLowerCase();
-  const zA = String(p.zonaAtajada||'').trim().toLowerCase();
+  // Normalizar zonas: solo letras, sin espacios ni caracteres raros
+  const limpiar = v => String(v||'').replace(/[^a-záéíóúñ]/gi,'').toLowerCase();
+  const zT = limpiar(p.zonaTiro);
+  const zA = limpiar(p.zonaAtajada);
   p.resultado = (zT && zA && zT === zA) ? 'atajado' : 'gol';
-  if(zT !== p.zonaTiro || zA !== p.zonaAtajada) {
-    console.warn('Penal con zonas raras:', {tiro:p.zonaTiro, atajada:p.zonaAtajada, normT:zT, normA:zA});
-  }
+  // Log para debug en consola
+  console.log('🥅 Atajada:', JSON.stringify({tiro:zT, atajada:zA, resultado:p.resultado}));
   p.resuelto = Date.now();
   lista[idx] = p;
   // animación corta antes de mostrar resultado grande
