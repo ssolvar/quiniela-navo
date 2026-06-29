@@ -61,7 +61,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 .jugados-toggle:hover{background:#141e5c}
 @keyframes jugadosPulse{0%,100%{box-shadow:0 0 0 rgba(201,162,39,0);border-color:#1a2a70}50%{box-shadow:0 0 14px rgba(201,162,39,.55);border-color:var(--do);color:var(--dos)}}
 /* === PENALES === */
-#penal-banner{margin:10px 0}
+#penal-banner{margin:6px 16px 10px}
 .pban{display:flex;align-items:center;gap:10px;background:#1a1230;border:1.5px solid var(--do);border-radius:10px;padding:11px 13px;cursor:pointer;animation:pbanPulse 1.4s ease-in-out infinite;font-family:'Inter',sans-serif;text-align:left;width:100%}
 .pban-ico{font-size:22px;flex-shrink:0}
 .pban-tx{flex:1;font-size:13px;color:#fff;line-height:1.35}
@@ -356,7 +356,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v7.9</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v8.0</p>
 </header>
 
 <div class="topbar">
@@ -377,12 +377,13 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
   <span id="online-text">Cargando...</span>
 </div>
 
+<!-- AVISO DE PENAL (global: aparece en cualquier pestaña) -->
+<div id="penal-banner" style="display:none"></div>
+
 <!-- PANELS -->
 <div id="tab-tabla" class="panel active">
   <!-- RETO ACTIVO -->
   <div id="reto-principal"></div>
-  <!-- AVISO DE PENAL -->
-  <div id="penal-banner" style="display:none"></div>
   <!-- CHAT -->
   <div class="chat-wrap">
     <div class="chat-title">💬 Chat del grupo</div>
@@ -2320,6 +2321,15 @@ function iniciarChatTimer() {
       if(chatAnterior !== chatNuevo) {
         db.chat = fresh.chat||[];
         renderChat();
+      }
+      // Refrescar penales (con guard anti-stale para no pisar escritos locales recientes)
+      const penAnt = JSON.stringify(db.penales||[]);
+      const penNuevo = JSON.stringify(fresh.penales||[]);
+      const dirty = (window.dirtyHasta && dirtyHasta.penales && dirtyHasta.penales > Date.now());
+      if(!dirty && penAnt !== penNuevo) {
+        db.penales = fresh.penales || [];
+        renderPenalBanner();
+        if(document.getElementById('tab-juego')?.classList.contains('active')) renderJuego();
       }
     } catch(e) {}
   }, 10*1000); // cada 10 segundos
