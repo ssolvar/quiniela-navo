@@ -374,7 +374,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v9.3</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v9.4</p>
 </header>
 
 <div class="topbar">
@@ -2336,6 +2336,7 @@ async function renderPenalBanner() {
 
 function svgCancha(modo, gkClass, ballClass){
   // modo: 'tirar' o 'atajar' — solo cambia colorcito de zonas
+  const ballUrl = 'https://raw.githubusercontent.com/ssolvar/quiniela-navo/main/img/balon.png';
   return `<svg class="cancha" viewBox="0 0 300 170" preserveAspectRatio="xMidYMid meet">
     <rect x="0" y="0" width="300" height="170" fill="#0d3b1a"/>
     <ellipse cx="150" cy="162" rx="160" ry="22" fill="#0f4a22"/>
@@ -2354,8 +2355,7 @@ function svgCancha(modo, gkClass, ballClass){
       <rect x="143" y="110" width="14" height="3" fill="#0a0e27"/>
     </g>
     <g class="ball-body ${ballClass||''}" style="transform-origin:150px 138px">
-      <circle cx="150" cy="138" r="6" fill="#fff" stroke="#222" stroke-width="0.8"/>
-      <path d="M150 132 l2.5 3.5 -1 3.5 h-3 l-1 -3.5 z" fill="#222"/>
+      <image href="${ballUrl}" x="138" y="126" width="24" height="24" />
     </g>
   </svg>`;
 }
