@@ -86,6 +86,12 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 .pen-row{display:flex;align-items:center;justify-content:space-between;background:#0d1440;border-radius:7px;padding:8px 12px;margin-bottom:5px;font-family:'Inter',sans-serif;font-size:13px;color:#fff}
 .pen-row .medal{margin-right:5px}
 .pen-row small{color:#aab8e0;font-size:11px}
+.stats-row{display:grid;grid-template-columns:1.4fr .9fr .9fr .9fr;align-items:center;background:#0d1440;border-radius:7px;padding:8px 10px;margin-bottom:5px;font-family:'Inter',sans-serif;font-size:13px;color:#fff;gap:4px}
+.stats-row.stats-head{background:transparent;padding:4px 10px;font-size:11px;color:#8899cc;font-weight:500;margin-bottom:3px}
+.stats-name{display:flex;align-items:center}
+.stats-name .medal{margin-right:5px}
+.stats-col{text-align:center;font-variant-numeric:tabular-nums}
+.stats-row:not(.stats-head) .stats-col{font-weight:600}
 .gk-body,.ball-body{transition:transform 1s ease-out}
 .gk-dive-l{transform:translate(-60px,8px) rotate(-55deg)}
 .gk-dive-r{transform:translate(60px,8px) rotate(55deg)}
@@ -357,7 +363,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v8.4</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v8.5</p>
 </header>
 
 <div class="topbar">
@@ -430,8 +436,8 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
     <div id="juego-cont"></div>
   </div>
   <div class="card">
-    <h2>🏆 Mejores rachas</h2>
-    <p style="font-size:12px;color:#8899cc;margin-bottom:10px">Atajadas seguidas sin recibir gol</p>
+    <h2>📊 Estadísticas</h2>
+    <p style="font-size:12px;color:#8899cc;margin-bottom:10px">Tiros, atajadas y goles de cada participante</p>
     <div id="penales-ranking"></div>
   </div>
 </div>
@@ -2078,17 +2084,19 @@ function penalesEstado() {
   return { debeAtajar, otrosPendientes };
 }
 
-function calcularRachas() {
-  // Mejor racha de atajadas consecutivas por jugador
-  const lista = (db.penales||[]).filter(p=>p.resuelto).slice().sort((a,b)=>a.resuelto-b.resuelto);
-  const cur={}, max={};
-  lista.forEach(p=>{
-    const v=p.a;
-    if(!(v in cur)){cur[v]=0;max[v]=0;}
-    if(p.resultado==='atajado'){ cur[v]++; if(cur[v]>max[v]) max[v]=cur[v]; }
-    else cur[v]=0;
+function calcularStats() {
+  // Stats por jugador a partir de los penales RESUELTOS
+  // tiros = penales que tiró | atajadas = los que le tiraron y atajó | goles = los que tiró y metió
+  const s = {};
+  const get = n => (s[n] = s[n] || { tiros:0, atajadas:0, goles:0, recibidos:0 });
+  (db.penales||[]).filter(p=>p.resuelto).forEach(p => {
+    const tirador = get(p.de), arquero = get(p.a);
+    tirador.tiros++;
+    arquero.recibidos++;
+    if(p.resultado==='atajado') arquero.atajadas++;
+    else tirador.goles++;
   });
-  return { actual:cur, mejor:max };
+  return s;
 }
 
 async function refrescarPenalesFresh() {
@@ -2162,7 +2170,7 @@ async function renderJuego() {
   await refrescarPenalesFresh();
   const yo = getMiNombre();
   const { debeAtajar, otrosPendientes } = penalesEstado();
-  const rachas = calcularRachas();
+  const stats = calcularStats();
 
   // PANTALLA DE RESULTADO (después de atajar) — queda fija hasta que el user la cierra
   if(ultimoResultado) {
@@ -2182,7 +2190,7 @@ async function renderJuego() {
       </div>
       ${svgCancha('resultado', gkCls, ballCls)}
       <div style="text-align:center;font-size:12px;color:#c9a227;margin:8px 0">
-        Racha actual: <b>${rachas.actual[yo]||0}</b> · Mejor: <b>${rachas.mejor[yo]||0}</b>
+        Goles: <b>${(stats[yo]&&stats[yo].goles)||0}</b> · Atajadas: <b>${(stats[yo]&&stats[yo].atajadas)||0}</b>
       </div>
       <button class="btn-go" onclick="cerrarResultado()">
         ${ataj?'¡A devolverle el penal! ⚽':'Tirarle un penal de vuelta ⚽'}
@@ -2206,7 +2214,7 @@ async function renderJuego() {
         <button class="zbtn ${z==='der'?'sel':''}" onclick="elegirZona('der')">der →</button>
       </div>
       <button class="btn-go aja" ${z?'':'disabled'} onclick="atajarPenal('${debeAtajar.id}')">Atajar</button>
-      <p style="font-size:11px;color:#8899cc;text-align:center;margin-top:8px">Racha actual: ${rachas.actual[yo]||0} · Mejor: ${rachas.mejor[yo]||0}</p>`;
+      <p style="font-size:11px;color:#8899cc;text-align:center;margin-top:8px">Goles: ${(stats[yo]&&stats[yo].goles)||0} · Atajadas: ${(stats[yo]&&stats[yo].atajadas)||0}</p>`;
   } else {
     // Modo TIRAR
     const participantes = (db.participantes||[]).filter(p=>p.nombre!==yo);
@@ -2274,11 +2282,24 @@ function cerrarResultado(){ ultimoResultado = null; renderJuego(); renderPenalBa
 function renderPenalRanking(){
   const r = document.getElementById('penales-ranking');
   if(!r) return;
-  const rachas = calcularRachas();
-  const lista = Object.entries(rachas.mejor).map(([n,m])=>({n,m,actual:rachas.actual[n]||0})).sort((a,b)=>b.m-a.m||b.actual-a.actual);
+  const stats = calcularStats();
+  const lista = Object.entries(stats)
+    .map(([n,s])=>({n, tiros:s.tiros, atajadas:s.atajadas, goles:s.goles}))
+    .sort((a,b)=> b.goles-a.goles || b.atajadas-a.atajadas);
   if(!lista.length){ r.innerHTML='<div style="text-align:center;padding:10px;color:#8899cc;font-size:12px">Sin penales todavía</div>'; return; }
   const med=['🥇','🥈','🥉'];
-  r.innerHTML = lista.map((x,i)=>`<div class="pen-row"><span><span class="medal">${med[i]||'·'}</span>${x.n}</span><small>${x.m} mejor racha · ${x.actual} actual</small></div>`).join('');
+  // Encabezado + filas (3 columnas: tiros, atajadas, goles)
+  r.innerHTML = `<div class="stats-row stats-head">
+      <span class="stats-name">Jugador</span>
+      <span class="stats-col">⚽ Tiros</span>
+      <span class="stats-col">🧤 Atajó</span>
+      <span class="stats-col">🥅 Goles</span>
+    </div>` + lista.map((x,i)=>`<div class="stats-row">
+      <span class="stats-name"><span class="medal">${med[i]||'·'}</span>${x.n}</span>
+      <span class="stats-col">${x.tiros}</span>
+      <span class="stats-col">${x.atajadas}</span>
+      <span class="stats-col">${x.goles}</span>
+    </div>`).join('');
 }
 
 function renderChat() {
