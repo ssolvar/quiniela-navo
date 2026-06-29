@@ -374,7 +374,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v9.7</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v9.8</p>
 </header>
 
 <div class="topbar">
@@ -2137,12 +2137,14 @@ function estadoContraRival(yo, otro) {
     return { bloqueado:true, motivo:'esperando que '+otro+' ataje' };
   }
   // Último resuelto → le toca tirar al receptor de ese tiro...
-  // a menos que ambos ya tengan 5+ tiros y la tanda esté cerrada.
+  // a menos que sean exactamente múltiplos de tanda (10, 20...) y esté cerrada.
   if(ultimo.a === yo) {
     const deMi = lista.filter(p => p.de===yo && p.resuelto).length;
     const deOtro = lista.filter(p => p.de===otro && p.resuelto).length;
-    if(deMi >= 5 && deOtro >= 5 && par && !par.pendiente) {
-      return { puedeIniciar:true }; // tanda cerrada, cualquiera puede reiniciar
+    const total = deMi + deOtro;
+    const esMultiploDeTanda = (total > 0 && total % 10 === 0);
+    if(esMultiploDeTanda && deMi === deOtro && par && !par.pendiente) {
+      return { puedeIniciar:true }; // tanda cerrada exacta, cualquiera puede reiniciar
     }
     return { debeTirar:true };
   }
