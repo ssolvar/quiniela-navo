@@ -374,7 +374,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v10.6</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v10.7</p>
 </header>
 
 <div class="topbar">
@@ -2095,7 +2095,9 @@ let chatTimer = null;
 // Cada penal: {id, de, a, zonaTiro, zonaAtajada, resultado:'gol'|'atajado', creado, resuelto}
 let penalSel = { zona:null, rival:null };
 let ultimoResultado = null; // {de, zonaTiro, zonaAtajada, resultado} — para pantalla de resultado
-let salirForzado = new Set(); // rivales con los que ya di Salir, forzar modo libre
+let salirForzado = new Set(JSON.parse(sessionStorage.getItem('q_salirForzado')||'[]')); // persiste al refrescar
+function addSalirForzado(r) { salirForzado.add(r); sessionStorage.setItem('q_salirForzado', JSON.stringify([...salirForzado])); }
+function delSalirForzado(r) { salirForzado.delete(r); sessionStorage.setItem('q_salirForzado', JSON.stringify([...salirForzado])); }
 
 function getMiNombre() {
   const me = (db.participantes||[]).find(p=>p.id===currentUserId);
@@ -2141,16 +2143,23 @@ function estadoContraRival(yo, otro) {
   if(par && par.pendiente && par.pendiente.vistos.includes(yo)) {
     return { puedeIniciar:true };
   }
-  // ¿Tanda cerrada por ambos? → fuera del ciclo
+  // Contar penales resueltos
   const deMi = lista.filter(p => p.de===yo && p.resuelto).length;
   const deOtro = lista.filter(p => p.de===otro && p.resuelto).length;
   const total = deMi + deOtro;
+  // ¿Tanda cerrada por ambos y total exacto? → fuera del ciclo
   if(par && !par.pendiente && total > 0 && total % 10 === 0 && deMi === deOtro) {
+    return { puedeIniciar:true };
+  }
+  // ¿Confirmé la última tanda completa aunque haya penales extra? → fuera del ciclo
+  const ultimaTanda = Math.floor(total / 10);
+  if(ultimaTanda > 0 && par && !par.pendiente && salirForzado.has(otro)) {
     return { puedeIniciar:true };
   }
 
   // El último penal manda
   if(ultimo.a === yo) return { debeTirar:true };
+  if(salirForzado.has(otro)) return { puedeIniciar:true }; // di Salir, fuera del ciclo
   return { bloqueado:true, motivo:'le toca tirar a '+otro };
 }
 
@@ -2542,7 +2551,7 @@ async function tirarPenal(){
   const yo=getMiNombre(); if(!yo||!penalSel.zona||!penalSel.rival) return;
   await refrescarPenalesFresh();
   // Si ya di Salir contra este rival y ahora le tiro, salir del modo forzado
-  if(salirForzado.has(penalSel.rival)) salirForzado.delete(penalSel.rival);
+  if(salirForzado.has(penalSel.rival)) delSalirForzado(penalSel.rival);
   // Validar contra las dos reglas: puedeIniciar (sin serie) o debeTirar (me toca tras atajar/recibir gol)
   const e = estadoContraRival(yo, penalSel.rival);
   if(e.bloqueado) { toast('No podés tirar ahora — '+e.motivo); return; }
@@ -2602,7 +2611,7 @@ async function confirmarTanda(parKey, numTanda) {
   await refrescarPenalesFresh();
   // Salir al modo libre — forzar que no haya devolver/atajar contra este rival
   const rival = parKey.split('|').find(n => n!==yo);
-  salirForzado.add(rival);
+  addSalirForzado(rival);
   penalSel = { zona:null, rival:null };
   ultimoResultado = null;
   toast('✅ Resultado visto');
