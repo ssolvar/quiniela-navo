@@ -374,7 +374,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v9.0</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v9.1</p>
 </header>
 
 <div class="topbar">
@@ -448,6 +448,10 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
   </div>
   <div class="card">
     <h2>📊 Estadísticas</h2>
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      <button id="stats-tab-juego" class="gtab active" onclick="cambiarStatsTab('juego')">⚽ En juego</button>
+      <button id="stats-tab-historial" class="gtab" onclick="cambiarStatsTab('historial')">📋 Historial</button>
+    </div>
     <p style="font-size:12px;color:#8899cc;margin-bottom:10px">Tiros, atajadas y goles de cada participante</p>
     <div id="penales-ranking"></div>
   </div>
@@ -539,6 +543,13 @@ let faseManual = false; // true cuando el usuario elige una fase manualmente (de
 let retoIndex = 0; // índice del reto activo en pantalla principal
 let jugadosAbierto = false; // pestaña colapsable de partidos jugados
 function toggleJugados(){ jugadosAbierto = !jugadosAbierto; renderPartidos(); }
+let statsTabActivo = 'juego'; // 'juego' | 'historial' — pestaña de stats de penales
+function cambiarStatsTab(t){
+  statsTabActivo = t;
+  document.getElementById('stats-tab-juego').classList.toggle('active', t==='juego');
+  document.getElementById('stats-tab-historial').classList.toggle('active', t==='historial');
+  renderPenalRanking();
+}
 let premiosTemp = [];
 
 // =============================================
@@ -2155,7 +2166,14 @@ function penalesEstado() {
       acciones.push({ tipo:'devolver', cuando:ult?(ult.resuelto||0):0, rival:r });
     }
   });
-  acciones.sort((a,b)=>a.cuando-b.cuando);
+  // Prioridad: devolver (tirar de vuelta) siempre antes que atajar a otro rival.
+  // Así el ciclo es: atajar → tirar al mismo → atajar al siguiente → tirar al siguiente.
+  // Nunca se atajan dos de rivales distintos sin devolver el penal entre medio.
+  acciones.sort((a,b)=>{
+    if(a.tipo==='devolver' && b.tipo==='atajar') return -1;
+    if(a.tipo==='atajar' && b.tipo==='devolver') return 1;
+    return a.cuando - b.cuando;
+  });
   const siguienteAccion = acciones[0] || null;
 
   return { siguienteAccion, esperaConfirmYo, pendientesParaConfirmar, estadoPorRival };
@@ -2557,8 +2575,12 @@ async function confirmarTanda(parKey, numTanda) {
 function renderPenalRanking(){
   const r = document.getElementById('penales-ranking');
   if(!r) return;
-  const series = calcularSeries();
+  const yo = getMiNombre();
+  let series = calcularSeries();
   if(!series.length){ r.innerHTML='<div style="text-align:center;padding:10px;color:#8899cc;font-size:12px">Sin penales todavía</div>'; return; }
+  // Filtrar solo las series del jugador actual (no mostrar partidos de otros)
+  if(yo) series = series.filter(s => s.a===yo || s.b===yo);
+  if(!series.length){ r.innerHTML='<div style="text-align:center;padding:10px;color:#8899cc;font-size:12px">No tenés partidos todavía</div>'; return; }
   const enJuego = series.filter(s=>(s.actual.tirosA.length+s.actual.tirosB.length)>0 && !s.pendiente);
   const pendientes = series.filter(s=>s.pendiente);
   const cerradas = [];
@@ -2587,30 +2609,66 @@ function renderPenalRanking(){
   };
 
   let html = '';
-  if(pendientes.length){
-    html += '<div class="t-section">⏳ Pendientes de revisar</div>';
-    html += pendientes.map(s => {
-      const t = s.pendiente;
-      const eti = t.vistos.length + '/2 vieron · Tanda ' + t.numTanda;
-      return tarjeta(s.a, s.b, t.tirosA, t.tirosB, eti, 'pendiente');
-    }).join('');
+  if(statsTabActivo === 'historial'){
+    // MODO HISTORIAL: mostrar todas las tandas cerradas (histórico)
+    if(cerradas.length){
+      html += '<div class="t-section">🏆 Tandas completadas</div>';
+      html += cerradas.map(c => {
+        const eti = (c.ganador ? '🏆 ' + c.ganador : '🤝 Empate') + ' · Tanda ' + c.numTanda;
+        return tarjeta(c.par.a, c.par.b, c.tirosA, c.tirosB, eti, 'cerrada');
+      }).join('');
+      // Mostrar también la tanda en juego si hay
+      if(enJuego.length){
+        html += '<div class="t-section" style="margin-top:10px">⚽ También en juego ahora</div>';
+        html += enJuego.map(s => {
+          const tirosTot = s.actual.tirosA.length + s.actual.tirosB.length;
+          const eti = 'Tanda ' + s.numTanda + ' · ' + tirosTot + '/10 tiros';
+          return tarjeta(s.a, s.b, s.actual.tirosA, s.actual.tirosB, eti);
+        }).join('');
+      }
+    } else {
+      html += '<div style="text-align:center;padding:10px;color:#8899cc;font-size:12px">No hay tandas completadas todavía</div>';
+      // Pero si hay tanda en juego, mostrarla
+      if(enJuego.length){
+        html += '<div class="t-section" style="margin-top:6px">⚽ Tanda en juego</div>';
+        html += enJuego.map(s => {
+          const tirosTot = s.actual.tirosA.length + s.actual.tirosB.length;
+          const eti = 'Tanda ' + s.numTanda + ' · ' + tirosTot + '/10 tiros';
+          return tarjeta(s.a, s.b, s.actual.tirosA, s.actual.tirosB, eti);
+        }).join('');
+      }
+    }
+  } else {
+    // MODO EN JUEGO: mostrar pendientes y en juego
+    if(pendientes.length){
+      html += '<div class="t-section">⏳ Pendientes de revisar</div>';
+      html += pendientes.map(s => {
+        const t = s.pendiente;
+        const eti = t.vistos.length + '/2 vieron · Tanda ' + t.numTanda;
+        return tarjeta(s.a, s.b, t.tirosA, t.tirosB, eti, 'pendiente');
+      }).join('');
+    }
+    if(enJuego.length){
+      html += '<div class="t-section">⚽ En juego</div>';
+      html += enJuego.map(s => {
+        const tirosTot = s.actual.tirosA.length + s.actual.tirosB.length;
+        const eti = 'Tanda ' + s.numTanda + ' · ' + tirosTot + '/10 tiros';
+        return tarjeta(s.a, s.b, s.actual.tirosA, s.actual.tirosB, eti);
+      }).join('');
+    }
+    // Mini-resumen de últimas 2 cerradas
+    if(cerradas.length){
+      html += '<div class="t-section" style="margin-top:8px">🏆 Últimas ganadas</div>';
+      html += cerradas.slice(-2).map(c => {
+        const eti = (c.ganador ? '🏆 ' + c.ganador : '🤝 Empate') + ' · Tanda ' + c.numTanda;
+        return tarjeta(c.par.a, c.par.b, c.tirosA, c.tirosB, eti, 'cerrada');
+      }).join('');
+    }
+    if(!pendientes.length && !enJuego.length && !cerradas.length){
+      html += '<div style="text-align:center;padding:10px;color:#8899cc;font-size:12px">Sin tandas todavía</div>';
+    }
   }
-  if(enJuego.length){
-    html += '<div class="t-section">⚽ En juego</div>';
-    html += enJuego.map(s => {
-      const tirosTot = s.actual.tirosA.length + s.actual.tirosB.length;
-      const eti = 'Tanda ' + s.numTanda + ' · ' + tirosTot + '/10 tiros';
-      return tarjeta(s.a, s.b, s.actual.tirosA, s.actual.tirosB, eti);
-    }).join('');
-  }
-  if(cerradas.length){
-    html += '<div class="t-section">🏆 Tandas ganadas</div>';
-    html += cerradas.map(c => {
-      const eti = '🏆 ' + c.ganador + ' · Tanda ' + c.numTanda;
-      return tarjeta(c.par.a, c.par.b, c.tirosA, c.tirosB, eti, 'cerrada');
-    }).join('');
-  }
-  r.innerHTML = html || '<div style="text-align:center;padding:10px;color:#8899cc;font-size:12px">Sin tandas todavía</div>';
+  r.innerHTML = html;
 }
 
 function renderChat() {
