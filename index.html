@@ -374,7 +374,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v10.8</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v10.9</p>
 </header>
 
 <div class="topbar">
@@ -2155,18 +2155,6 @@ function estadoContraRival(yo, otro) {
   // ¿salirForzado? → fuera del ciclo
   if(salirForzado.has(otro)) {
     return { puedeIniciar:true };
-  }
-  // ¿Penales extra tras tanda confirmada? → auto-salir
-  // (OpenClaw crea penales extra, total%10 != 0, la tanda ya fue confirmada)
-  const ultimaTanda = Math.floor(total / 10);
-  if(ultimaTanda > 0 && total % 10 !== 0) {
-    const yoConfirme = (db.tandasConfirm||[]).some(c =>
-      c.par===(([yo,otro].sort()).join('|')) && c.numTanda===ultimaTanda && c.vistos.includes(yo)
-    );
-    if(yoConfirme) {
-      addSalirForzado(otro);
-      return { puedeIniciar:true };
-    }
   }
 
   // El último penal manda
