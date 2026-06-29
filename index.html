@@ -374,7 +374,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v8.9</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v9.0</p>
 </header>
 
 <div class="topbar">
@@ -2090,51 +2090,75 @@ function getMiNombre() {
   return me ? me.nombre : null;
 }
 
+// =============================================
+// REGLAS DEL JUEGO (simples y estrictas):
+// 1) Si NO hay serie activa con X → cualquiera de los dos puede tirar el primer penal.
+// 2) Si HAY serie activa con X → SOLO uno de los dos puede actuar a la vez (alternancia estricta):
+//    - Si el último penal está SIN atajar → solo el arquero puede actuar (atajar).
+//    - Si el último penal ya se atajó/fue gol → le toca tirar al OTRO jugador (el que recibió).
+//
+// "Serie activa" = tanda en curso (no completa y no pendiente de confirmar).
+// Cuando una tanda se cierra (5 tiros de cada uno) → queda pendiente de revisar; durante
+// ese estado nadie puede tirar a ese rival hasta que ambos confirmen.
+// =============================================
+
+// Devuelve el estado del par (yo, otro): { puedeIniciar, debeAtajar, debeTirar, bloqueado, motivo }
+function estadoContraRival(yo, otro) {
+  const lista = (db.penales||[]).filter(p =>
+    (p.de===yo && p.a===otro) || (p.de===otro && p.a===yo)
+  ).sort((a,b)=>(a.creado||0)-(b.creado||0));
+
+  // Tanda pendiente de revisión: nadie puede tirar
+  const series = calcularSeries();
+  const par = series.find(s => (s.a===yo && s.b===otro) || (s.a===otro && s.b===yo));
+  if(par && par.pendiente) {
+    return { bloqueado:true, motivo:'tanda en revisión' };
+  }
+
+  // Sin penales entre los dos → cualquiera puede iniciar
+  if(!lista.length) return { puedeIniciar:true };
+
+  // El último penal manda
+  const ultimo = lista[lista.length-1];
+  if(!ultimo.resuelto) {
+    // Penal en el aire: solo el arquero puede atajarlo
+    if(ultimo.a === yo) return { debeAtajar:ultimo };
+    return { bloqueado:true, motivo:'esperando que '+otro+' ataje' };
+  }
+  // Último resuelto → le toca tirar al receptor de ese tiro
+  if(ultimo.a === yo) return { debeTirar:true };
+  return { bloqueado:true, motivo:'le toca tirar a '+otro };
+}
+
 function penalesEstado() {
   const yo = getMiNombre();
-  if(!yo) return { siguienteAccion:null, otrosPendientes:[], esperaConfirmYo:[], pendientesParaConfirmar:[] };
-  const lista = db.penales || [];
-  // a quién YA le tiré (esperando respuesta) — para bloquear re-tiros por penal en curso
-  const otrosPendientes = lista.filter(p=>p.de===yo && !p.resuelto).map(p=>p.a);
-  // Rivales con tanda pendiente de confirmar
+  if(!yo) return { siguienteAccion:null, esperaConfirmYo:[], pendientesParaConfirmar:[], estadoPorRival:{} };
   const series = calcularSeries();
   const tandasMias = series.filter(s => (s.a===yo||s.b===yo) && s.pendiente);
   const esperaConfirmYo = tandasMias.map(s => s.a===yo ? s.b : s.a);
   const pendientesParaConfirmar = tandasMias.filter(s => !s.pendiente.vistos.includes(yo));
 
-  // ============================================================
-  // COLA UNIFICADA ordenada por TIEMPO. La siguiente acción es la más vieja entre:
-  //  - ATAJAR: un penal que me tiraron y no resolví (timestamp = cuando me lo tiraron)
-  //  - DEVOLVER: una atajada/gol que recibí y todavía no le devolví tiro (timestamp = cuando se resolvió ese penal)
-  // ============================================================
+  // Calcular estado contra CADA rival
+  const otros = (db.participantes||[]).filter(p => p.nombre!==yo).map(p => p.nombre);
+  const estadoPorRival = {};
+  otros.forEach(r => { estadoPorRival[r] = estadoContraRival(yo, r); });
+
+  // Siguiente acción de cola: la más vieja entre atajar/devolver de TODAS las series
   const acciones = [];
-  // ATAJAR: penales sin resolver donde yo soy el arquero
-  lista.filter(p=>p.a===yo && !p.resuelto).forEach(p => {
-    acciones.push({ tipo:'atajar', cuando:p.creado||0, penal:p, rival:p.de });
-  });
-  // DEVOLVER: por cada penal resuelto donde alguien me tiró, si yo no le he tirado uno DESPUÉS, le debo
-  const meTiraronResueltos = lista.filter(p=>p.resuelto && p.a===yo).sort((a,b)=>(a.resuelto||0)-(b.resuelto||0));
-  // Track: voy a "consumir" un tiro mío por cada deuda. Si tiré 2 a la misma persona, cubren 2 deudas.
-  const tirosMiosA = {};
-  lista.filter(p=>p.de===yo).sort((a,b)=>(a.creado||0)-(b.creado||0)).forEach(p => {
-    tirosMiosA[p.a] = (tirosMiosA[p.a]||[]).concat(p.creado||0);
-  });
-  meTiraronResueltos.forEach(p => {
-    const tirosDespues = (tirosMiosA[p.de]||[]).filter(t => t > (p.resuelto||0));
-    if(tirosDespues.length > 0) {
-      // ya devolví — consumo el primer tiro mío posterior y sigo
-      const idx = (tirosMiosA[p.de]||[]).indexOf(tirosDespues[0]);
-      if(idx>=0) tirosMiosA[p.de].splice(idx,1);
-    } else {
-      // todavía debo este → encolar como devolver con el tiempo de resolución
-      acciones.push({ tipo:'devolver', cuando:p.resuelto||0, rival:p.de });
+  otros.forEach(r => {
+    const e = estadoPorRival[r];
+    if(e.debeAtajar) acciones.push({ tipo:'atajar', cuando:e.debeAtajar.creado||0, penal:e.debeAtajar, rival:r });
+    else if(e.debeTirar) {
+      // Para "devolver" usamos el resuelto del último penal contra ese rival como timestamp
+      const ult = (db.penales||[]).filter(p=>(p.de===yo&&p.a===r)||(p.de===r&&p.a===yo))
+        .sort((a,b)=>(a.creado||0)-(b.creado||0)).slice(-1)[0];
+      acciones.push({ tipo:'devolver', cuando:ult?(ult.resuelto||0):0, rival:r });
     }
   });
-  // Ordenar por tiempo ascendente y agarrar la más vieja
   acciones.sort((a,b)=>a.cuando-b.cuando);
   const siguienteAccion = acciones[0] || null;
 
-  return { siguienteAccion, otrosPendientes, esperaConfirmYo, pendientesParaConfirmar };
+  return { siguienteAccion, esperaConfirmYo, pendientesParaConfirmar, estadoPorRival };
 }
 
 function calcularStats() {
@@ -2232,7 +2256,7 @@ async function renderPenalBanner() {
   const yo = getMiNombre();
   if(!yo || !currentUserId) { el.style.display='none'; return; }
   await refrescarPenalesFresh();
-  const { siguienteAccion, otrosPendientes, esperaConfirmYo, pendientesParaConfirmar } = penalesEstado();
+  const { siguienteAccion, esperaConfirmYo, pendientesParaConfirmar, estadoPorRival } = penalesEstado();
   // 1) Resumen de tanda pendiente de confirmar — prioridad máxima
   if(pendientesParaConfirmar && pendientesParaConfirmar.length){
     const s = pendientesParaConfirmar[0];
@@ -2260,10 +2284,12 @@ async function renderPenalBanner() {
     }
     return;
   }
-  // 3) Tirar libre — rivales sin bloqueo
+  // 3) Tirar libre — rivales que puedo iniciar o me toca tirar contra
   const participantes = (db.participantes||[]).filter(p=>p.nombre!==yo);
-  const bloqueados = new Set([...otrosPendientes, ...(esperaConfirmYo||[])]);
-  const puedeTirarA = participantes.filter(p=>!bloqueados.has(p.nombre));
+  const puedeTirarA = participantes.filter(p => {
+    const e = estadoPorRival[p.nombre];
+    return e && (e.puedeIniciar || e.debeTirar);
+  });
   if(puedeTirarA.length){
     el.style.display='block';
     el.innerHTML = `<button class="pban" onclick="showTab('juego')">
@@ -2308,7 +2334,7 @@ async function renderJuego() {
   // Asegurar que el estado de penales esté al día antes de pintar (regla: 1 tiro por rival pendiente)
   await refrescarPenalesFresh();
   const yo = getMiNombre();
-  const { siguienteAccion, otrosPendientes, pendientesParaConfirmar, esperaConfirmYo } = penalesEstado();
+  const { siguienteAccion, pendientesParaConfirmar, esperaConfirmYo, estadoPorRival } = penalesEstado();
   const stats = calcularStats();
 
   // RESUMEN DE TANDA TERMINADA — esperando que YO la marque como vista.
@@ -2415,7 +2441,7 @@ async function renderJuego() {
           <button class="zbtn ${z==='centro'?'sel':''}" onclick="elegirZona('centro')">⊙ centro</button>
           <button class="zbtn ${z==='der'?'sel':''}" onclick="elegirZona('der')">der →</button>
         </div>
-        <button class="btn-go" ${z?'':'disabled'} onclick="tirarPenal(true)">Tirarle el penal a ${rival}</button>`;
+        <button class="btn-go" ${z?'':'disabled'} onclick="tirarPenal()">Tirarle el penal a ${rival}</button>`;
     } else {
       // Modo ATAJAR
       const debeAtajar = siguienteAccion.penal;
@@ -2443,11 +2469,12 @@ async function renderJuego() {
     c.innerHTML = `${svgCancha('tirar', '', ballCls)}
       <div style="font-size:11px;color:#aab8e0;margin-bottom:6px">Elegí a quién tirarle:</div>
       <div class="rival-pick">${participantes.map(p=>{
-        const blqPen = otrosPendientes.includes(p.nombre);
-        const blqTan = (esperaConfirmYo||[]).includes(p.nombre);
-        const blq = blqPen || blqTan;
-        const motivo = blqTan ? 'tanda en revisión' : 'esperando…';
-        return `<button class="rival-btn ${rv===p.nombre?'sel':''} ${blq?'dis':''}" ${blq?'disabled':''} onclick="elegirRival('${p.nombre.replace(/'/g,"\\'")}')">${p.nombre}${blq?'<small>'+motivo+'</small>':''}</button>`;
+        const e = estadoPorRival[p.nombre] || {};
+        const habil = e.puedeIniciar || e.debeTirar;
+        const motivo = e.bloqueado ? (e.motivo||'esperando…')
+                     : e.debeAtajar ? 'te tiró, atajá'
+                     : 'esperando…';
+        return `<button class="rival-btn ${rv===p.nombre?'sel':''} ${habil?'':'dis'}" ${habil?'':'disabled'} onclick="elegirRival('${p.nombre.replace(/'/g,"\\'")}')">${p.nombre}${habil?'':'<small>'+motivo+'</small>'}</button>`;
       }).join('')}</div>
       <div style="font-size:11px;color:#aab8e0;margin:10px 0 6px">Elegí la zona:</div>
       <div class="zbtn-row">
@@ -2463,19 +2490,15 @@ async function renderJuego() {
 function elegirZona(z){ penalSel.zona=z; renderJuego(); }
 function elegirRival(r){ penalSel.rival=r; renderJuego(); }
 
-async function tirarPenal(esDevolucion){
+async function tirarPenal(){
   const yo=getMiNombre(); if(!yo||!penalSel.zona||!penalSel.rival) return;
   await refrescarPenalesFresh();
+  // Validar contra las dos reglas: puedeIniciar (sin serie) o debeTirar (me toca tras atajar/recibir gol)
+  const e = estadoContraRival(yo, penalSel.rival);
+  if(e.bloqueado) { toast('No podés tirar ahora — '+e.motivo); return; }
+  if(e.debeAtajar) { toast(penalSel.rival+' te tiró un penal — atajá ese primero'); return; }
+  if(!e.puedeIniciar && !e.debeTirar) { toast('No es tu turno de tirar'); return; }
   const lista = db.penales || [];
-  if(!esDevolucion) {
-    // Validaciones solo si es tiro libre (no devolución forzada por la cola)
-    if(lista.some(p=>p.de===yo && p.a===penalSel.rival && !p.resuelto)) {
-      toast('Ya le tiraste un penal a '+penalSel.rival+', esperá su respuesta'); return;
-    }
-    if(lista.some(p=>p.de===penalSel.rival && p.a===yo && !p.resuelto)) {
-      toast(penalSel.rival+' te tiró un penal primero — atajá ese'); return;
-    }
-  }
   const penal = { id:'p'+Date.now()+Math.random().toString(36).slice(2,6), de:yo, a:penalSel.rival, zonaTiro:penalSel.zona, creado:Date.now(), resuelto:null, _v:8 };
   const nueva = lista.concat(penal);
   await guardarCampos({ penales: nueva });
