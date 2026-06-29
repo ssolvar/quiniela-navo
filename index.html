@@ -374,7 +374,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v9.5</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v9.6</p>
 </header>
 
 <div class="topbar">
@@ -2149,27 +2149,29 @@ function penalesEstado() {
   const esperaConfirmYo = tandasMias.map(s => s.a===yo ? s.b : s.a);
   const pendientesParaConfirmar = tandasMias.filter(s => !s.pendiente.vistos.includes(yo));
 
-  // Si hay tandas pendientes de revisar, BLOQUEAR TODO.
-  // El jugador no puede tirar ni atajar hasta que revise el resultado.
-  if(pendientesParaConfirmar.length){
-    const estadoPorRival = {};
-    const otros = (db.participantes||[]).filter(p => p.nombre!==yo).map(p => p.nombre);
-    otros.forEach(r => { estadoPorRival[r] = { bloqueado:true, motivo:'revisá la tanda terminada' }; });
-    return { siguienteAccion:null, esperaConfirmYo, pendientesParaConfirmar, estadoPorRival };
-  }
+  // Si hay tandas pendientes de revisar, bloquear SOLO a esos rivales.
+  // Se puede seguir jugando contra otros mientras tanto.
+  const rivalesConPendiente = new Set(pendientesParaConfirmar.map(p => {
+    const s = p; return s.a===yo ? s.b : s.a;
+  }));
 
   // Calcular estado contra CADA rival
   const otros = (db.participantes||[]).filter(p => p.nombre!==yo).map(p => p.nombre);
   const estadoPorRival = {};
   otros.forEach(r => { estadoPorRival[r] = estadoContraRival(yo, r); });
+  // Bloquear solo a los rivales con tanda pendiente de revisar
+  rivalesConPendiente.forEach(r => {
+    estadoPorRival[r] = { bloqueado:true, motivo:'revisá la tanda terminada' };
+  });
 
   // Siguiente acción de cola: la más vieja entre atajar/devolver de TODAS las series
+  // (excepto rivales con tanda pendiente de revisar)
   const acciones = [];
   otros.forEach(r => {
+    if(rivalesConPendiente.has(r)) return; // este rival está bloqueado por tanda pendiente
     const e = estadoPorRival[r];
     if(e.debeAtajar) acciones.push({ tipo:'atajar', cuando:e.debeAtajar.creado||0, penal:e.debeAtajar, rival:r });
     else if(e.debeTirar) {
-      // Para "devolver" usamos el resuelto del último penal contra ese rival como timestamp
       const ult = (db.penales||[]).filter(p=>(p.de===yo&&p.a===r)||(p.de===r&&p.a===yo))
         .sort((a,b)=>(a.creado||0)-(b.creado||0)).slice(-1)[0];
       acciones.push({ tipo:'devolver', cuando:ult?(ult.resuelto||0):0, rival:r });
@@ -2379,12 +2381,14 @@ async function renderJuego() {
     const golesRival = s.a === yo ? t.golesB : t.golesA;
     const empate = t.ganador === null;
     const ganeYo = t.ganador === yo;
-    // Leyenda clara de quién ganó
-    const leyenda = empate
-      ? `<div style="font-size:15px;font-weight:700;color:#c9a227;letter-spacing:1px;background:rgba(201,162,39,.12);border:1.5px solid #c9a227;border-radius:10px;padding:10px 14px;text-align:center">🤝 ¡EMPATE! ${golesYo}-${golesRival} · Nadie ganó la tanda ${t.numTanda}</div>`
+    const cabecera = empate
+      ? `<div style="font-size:26px;font-weight:700;color:#c9a227;letter-spacing:1px">🤝 EMPATE</div>
+         <div style="font-size:11px;color:#aab8e0;margin-top:3px">Tanda ${t.numTanda} · arranca una nueva en 0-0</div>`
       : ganeYo
-        ? `<div style="font-size:15px;font-weight:700;color:#1d9e75;letter-spacing:1px;background:rgba(29,158,117,.12);border:1.5px solid #1d9e75;border-radius:10px;padding:10px 14px;text-align:center">🏆 ¡GANASTE! ${golesYo}-${golesRival} · Le ganaste la tanda ${t.numTanda} a ${rival}</div>`
-        : `<div style="font-size:15px;font-weight:700;color:#e24b4a;letter-spacing:1px;background:rgba(226,75,74,.12);border:1.5px solid #e24b4a;border-radius:10px;padding:10px 14px;text-align:center">😞 PERDISTE ${golesYo}-${golesRival} · ${rival} te ganó la tanda ${t.numTanda}</div>`;
+        ? `<div style="font-size:28px;font-weight:700;color:#1d9e75;letter-spacing:1px">🏆 ¡GANASTE LA TANDA!</div>
+           <div style="font-size:11px;color:#aab8e0;margin-top:3px">Tanda ${t.numTanda} · vs ${rival}</div>`
+        : `<div style="font-size:28px;font-weight:700;color:#e24b4a;letter-spacing:1px">😞 PERDISTE LA TANDA</div>
+           <div style="font-size:11px;color:#aab8e0;margin-top:3px">Tanda ${t.numTanda} · vs ${rival}</div>`;
     // detalle penal a penal
     const filas = t.penales.map((p,i) => {
       const tirador = p.de;
@@ -2407,18 +2411,37 @@ async function renderJuego() {
       <div class="t-row"><span class="t-name">${s.a}</span><span class="t-balls">${bolitas(t.tirosA)}</span><span class="t-score">${t.golesA}</span></div>
       <div class="t-row"><span class="t-name">${s.b}</span><span class="t-balls">${bolitas(t.tirosB)}</span><span class="t-score">${t.golesB}</span></div>
     </div>`;
-    const btnTexto = empate ? '✓ Aceptar y seguir jugando ⚽' : '✓ Aceptar e ir por la revancha ⚽';
     c.innerHTML = `
-      ${leyenda}
+      <div style="text-align:center;margin-bottom:10px">${cabecera}</div>
+      <div style="text-align:center;font-size:38px;font-weight:700;color:#fff;margin:5px 0 6px;letter-spacing:2px">
+        ${golesYo} - ${golesRival}
+      </div>
       ${visualTanda}
       <div style="font-size:11px;color:#8899cc;margin-bottom:6px">Detalle de la tanda:</div>
       ${filas}
-      <button class="btn-go" style="margin-top:12px" onclick="confirmarTanda('${s.parKey}', ${t.numTanda})">
-        ${btnTexto}
+      <button class="btn-go" style="margin-top:10px" onclick="confirmarTanda('${s.parKey}', ${t.numTanda})">
+        ${empate ? 'Reiniciar y a jugar ⚽' : 'Vamos por la revancha ⚽'}
       </button>
       <p style="font-size:11px;color:${otroVisto?'#1d9e75':'#8899cc'};text-align:center;margin-top:8px">
         ${otroVisto ? '✅ '+rival+' ya vio el resumen' : '⏳ esperando que '+rival+' también vea el resumen'}
       </p>`;
+    renderPenalRanking();
+    return;
+  }
+
+  // PANTALLA DE ELECCIÓN POST-TANDA — ambos confirmaron, ¿seguir o salir?
+  if(elegiendoContinuar) {
+    const rival = elegiendoContinuar.rival;
+    c.innerHTML = `
+      <div style="text-align:center;padding:20px 0">
+        <div style="font-size:40px;margin-bottom:10px">🏁</div>
+        <div style="font-size:18px;font-weight:700;color:#fff;margin-bottom:6px">Tanda ${elegiendoContinuar.numTanda} vs ${rival} revisada</div>
+        <div style="font-size:13px;color:#aab8e0;margin-bottom:20px">¿Querés seguir jugando contra ${rival}?</div>
+        <div style="display:flex;gap:10px;justify-content:center">
+          <button class="btn-go" style="flex:1;max-width:160px" onclick="continuarJugando('${rival.replace(/'/g,"\\'")}')">✅ Seguir jugando</button>
+          <button class="btn" style="flex:1;max-width:160px;background:#c8102e;color:#fff;border:none;border-radius:8px;padding:11px;font-family:'Inter',sans-serif;font-size:14px;font-weight:600;cursor:pointer" onclick="salirDelJuego()">🚪 Salir</button>
+        </div>
+      </div>`;
     renderPenalRanking();
     return;
   }
@@ -2569,7 +2592,9 @@ async function atajarPenal(idPenal){
 
 function cerrarResultado(){ ultimoResultado = null; renderJuego(); renderPenalBanner(); }
 
-// Marca a `yo` como "visto" para una tanda específica. Cuando ambos confirmaron, la tanda cierra y arranca la siguiente.
+// Marca a `yo` como "visto" para una tanda específica. Cuando ambos confirmaron,
+// se muestra pantalla de elección (¿seguir o salir?) para no seguir infinito.
+let elegiendoContinuar = null; // {parKey, numTanda, rival} — pantalla de elección post-tanda
 async function confirmarTanda(parKey, numTanda) {
   const yo = getMiNombre(); if(!yo) return;
   const lista = (db.tandasConfirm || []).slice();
@@ -2578,7 +2603,26 @@ async function confirmarTanda(parKey, numTanda) {
   if(!entry.vistos.includes(yo)) entry.vistos.push(yo);
   await guardarCampos({ tandasConfirm: lista });
   await refrescarPenalesFresh();
-  toast('✅ Resumen visto');
+  const rival = parKey.split('|').find(n => n!==yo);
+  // Si ambos ya confirmaron, mostrar pantalla de elección
+  if(entry.vistos.length >= 2) {
+    elegiendoContinuar = { parKey, numTanda, rival };
+  }
+  toast('✅ Resultado visto');
+  renderJuego(); renderPenalBanner();
+}
+
+async function continuarJugando(rival) {
+  elegiendoContinuar = null;
+  penalSel = { zona:null, rival:rival };
+  ultimoResultado = null;
+  renderJuego(); renderPenalBanner();
+}
+
+function salirDelJuego() {
+  elegiendoContinuar = null;
+  penalSel = { zona:null, rival:null };
+  ultimoResultado = null;
   renderJuego(); renderPenalBanner();
 }
 
