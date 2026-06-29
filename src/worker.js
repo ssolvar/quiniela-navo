@@ -168,33 +168,46 @@ export default {
     if (path === '/api/partidos/goles') {
       try {
         let partidosKV = await kvGet(KV, 'partidos') || [];
-        const sinGoles = partidosKV.filter(p => p.status === 'FT' && (!p.goles || p.goles.length === 0) && p.espnId);
-        await Promise.all(sinGoles.map(async p => {
+        // Backfill goles Y shootout para partidos FT sin datos completos
+        const sinDatos = partidosKV.filter(p => p.status === 'FT' && p.espnId && (
+          !p.goles || p.goles.length === 0 || !p.shootoutLocal
+        ));
+        await Promise.all(sinDatos.map(async p => {
           try {
             const sr = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/summary?event=${p.espnId}`);
             const sd = await sr.json();
             const evts = sd.keyEvents || [];
             const idx = partidosKV.findIndex(x => x.id === p.id);
             if(idx < 0) return;
-            partidosKV[idx].goles = evts
-              .filter(e => e.scoringPlay || (e.shortText && e.shortText.includes('Goal')))
-              .map(g => ({
-                minuto: g.clock?.displayValue || '',
-                jugador: limpiarJugador(g.shortText),
-                local: String(g.team?.id) === String(p.homeId),
-              }));
-            const golL = partidosKV[idx].goles.filter(g=>g.local).length;
-            const golV = partidosKV[idx].goles.filter(g=>!g.local).length;
-            partidosKV[idx].g1 = Math.max(partidosKV[idx].g1||0, golL);
-            partidosKV[idx].g2 = Math.max(partidosKV[idx].g2||0, golV);
-            partidosKV[idx].amarillasLocal = evts.filter(e=>e.shortText?.includes('Yellow Card')&&String(e.team?.id)===String(p.homeId)).length;
-            partidosKV[idx].amarillasVisita = evts.filter(e=>e.shortText?.includes('Yellow Card')&&String(e.team?.id)===String(p.awayId)).length;
-            partidosKV[idx].rojasLocal = evts.filter(e=>e.shortText?.includes('Red Card')&&String(e.team?.id)===String(p.homeId)).length;
-            partidosKV[idx].rojasVisita = evts.filter(e=>e.shortText?.includes('Red Card')&&String(e.team?.id)===String(p.awayId)).length;
+            if(!p.goles || p.goles.length === 0) {
+              partidosKV[idx].goles = evts
+                .filter(e => e.scoringPlay || (e.shortText && e.shortText.includes('Goal')))
+                .filter(e => !/shootout|penalty kick/i.test(e.type?.text||''))
+                .map(g => ({
+                  minuto: g.clock?.displayValue || '',
+                  jugador: limpiarJugador(g.shortText),
+                  local: String(g.team?.id) === String(p.homeId),
+                }));
+              const golL = partidosKV[idx].goles.filter(g=>g.local).length;
+              const golV = partidosKV[idx].goles.filter(g=>!g.local).length;
+              partidosKV[idx].g1 = Math.max(partidosKV[idx].g1||0, golL);
+              partidosKV[idx].g2 = Math.max(partidosKV[idx].g2||0, golV);
+              partidosKV[idx].amarillasLocal = evts.filter(e=>e.shortText?.includes('Yellow Card')&&String(e.team?.id)===String(p.homeId)).length;
+              partidosKV[idx].amarillasVisita = evts.filter(e=>e.shortText?.includes('Yellow Card')&&String(e.team?.id)===String(p.awayId)).length;
+              partidosKV[idx].rojasLocal = evts.filter(e=>e.shortText?.includes('Red Card')&&String(e.team?.id)===String(p.homeId)).length;
+              partidosKV[idx].rojasVisita = evts.filter(e=>e.shortText?.includes('Red Card')&&String(e.team?.id)===String(p.awayId)).length;
+            }
+            // Backfill shootout
+            if(!p.shootoutLocal && sd.shootout && sd.shootout.length) {
+              const homeTeam = sd.shootout.find(t => String(t.id) === String(p.homeId));
+              const awayTeam = sd.shootout.find(t => String(t.id) === String(p.awayId));
+              if(homeTeam) { partidosKV[idx].penalesLocal = homeTeam.shots.sort((a,b)=>a.shotNumber-b.shotNumber).map(s=>s.didScore); partidosKV[idx].shootoutLocal = homeTeam.shots.sort((a,b)=>a.shotNumber-b.shotNumber).map(s=>({jugador:s.player,gol:s.didScore})); }
+              if(awayTeam) { partidosKV[idx].penalesVisita = awayTeam.shots.sort((a,b)=>a.shotNumber-b.shotNumber).map(s=>s.didScore); partidosKV[idx].shootoutVisita = awayTeam.shots.sort((a,b)=>a.shotNumber-b.shotNumber).map(s=>({jugador:s.player,gol:s.didScore})); }
+            }
           } catch(e) {}
         }));
         await kvSet(KV, 'partidos', partidosKV);
-        return new Response(JSON.stringify({ ok: true, actualizados: sinGoles.length }), { headers: CORS });
+        return new Response(JSON.stringify({ ok: true, actualizados: sinDatos.length }), { headers: CORS });
       } catch(e) {
         return new Response(JSON.stringify({ error: e.message }), { headers: CORS, status: 500 });
       }
@@ -286,7 +299,7 @@ export default {
             let status = 'PRE';
             if(st?.completed) status = 'FT';
             else if(st?.name === 'STATUS_HALFTIME') status = 'HT';
-            else if(st?.name && /SHOOTOUT|PENALTY_KICK|PENALT/i.test(st.name)) status = 'PENS';
+            else if(st?.name && /SHOOTOUT|PENALTY_KICK/i.test(st.name)) status = 'PENS';
             else if(st?.name && /EXTRA|OVERTIME|_OT/i.test(st.name)) status = 'ET';
             else if(st?.state === 'in') status = 'LIVE';
             
@@ -356,35 +369,15 @@ export default {
                 partidosKV[idx].amarillasVisita = evts.filter(e=>e.shortText?.includes('Yellow Card')&&String(e.team?.id)===String(ep.awayId)).length;
                 partidosKV[idx].rojasLocal = evts.filter(e=>e.shortText?.includes('Red Card')&&String(e.team?.id)===String(ep.homeId)).length;
                 partidosKV[idx].rojasVisita = evts.filter(e=>e.shortText?.includes('Red Card')&&String(e.team?.id)===String(ep.awayId)).length;
-                // Tiros de penales del shootout (circulitos)
-                if(ep.status === 'PENS' || ep.status === 'FT') {
-                  // Intentar desde boxscore (linescores de penales)
-                  const comps = sd.boxscore?.teams || [];
-                  let pLocal = null, pVisita = null;
-                  comps.forEach(t => {
-                    const esLocal = String(t.team?.id) === String(ep.homeId);
-                    const ls = t.statistics?.find(s => s.name === 'shootoutGoals' || s.name === 'PKGoals');
-                    // Linescores: buscar columna de penales (P o PK o SO)
-                    const shootoutLine = (t.linescores||[]).find(l => /^(P|PK|SO)$/i.test(l.abbreviation||''));
-                    if(shootoutLine) {
-                      // Si hay linescores de penales, parseamos del texto de eventos
-                      const kicks = evts.filter(e =>
-                        /penalty kick/i.test(e.type?.text||'') &&
-                        String(e.team?.id) === String(esLocal ? ep.homeId : ep.awayId)
-                      ).map(e => /scored|goal/i.test(e.shortText||'') || e.scoringPlay === true);
-                      if(esLocal) pLocal = kicks; else pVisita = kicks;
-                    }
-                  });
-                  // Fallback: parsear todos los eventos de tipo penalty kick del shootout
-                  if(!pLocal && !pVisita) {
-                    const shootoutEvts = evts.filter(e => /penalty kick/i.test(e.type?.text||''));
-                    if(shootoutEvts.length) {
-                      pLocal  = shootoutEvts.filter(e => String(e.team?.id)===String(ep.homeId)).map(e => /scored|goal/i.test(e.shortText||'') || e.scoringPlay===true);
-                      pVisita = shootoutEvts.filter(e => String(e.team?.id)===String(ep.awayId)).map(e => /scored|goal/i.test(e.shortText||'') || e.scoringPlay===true);
-                    }
-                  }
-                  if(pLocal  !== null) partidosKV[idx].penalesLocal  = pLocal;
-                  if(pVisita !== null) partidosKV[idx].penalesVisita = pVisita;
+                // Tiros de penales del shootout — ESPN los guarda en sd.shootout[]
+                if(sd.shootout && sd.shootout.length) {
+                  const homeTeam = sd.shootout.find(t => String(t.id) === String(ep.homeId));
+                  const awayTeam = sd.shootout.find(t => String(t.id) === String(ep.awayId));
+                  if(homeTeam) partidosKV[idx].penalesLocal  = homeTeam.shots.sort((a,b)=>a.shotNumber-b.shotNumber).map(s=>s.didScore);
+                  if(awayTeam) partidosKV[idx].penalesVisita = awayTeam.shots.sort((a,b)=>a.shotNumber-b.shotNumber).map(s=>s.didScore);
+                  // Guardar también los nombres para mostrar en el card
+                  if(homeTeam) partidosKV[idx].shootoutLocal  = homeTeam.shots.sort((a,b)=>a.shotNumber-b.shotNumber).map(s=>({jugador:s.player, gol:s.didScore}));
+                  if(awayTeam) partidosKV[idx].shootoutVisita = awayTeam.shots.sort((a,b)=>a.shotNumber-b.shotNumber).map(s=>({jugador:s.player, gol:s.didScore}));
                 }
               } catch(e) {}
             }
