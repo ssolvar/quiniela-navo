@@ -226,7 +226,7 @@ export default {
     // ==========================================
     if (path === '/api/db') {
       if (request.method === 'GET') {
-        const [participantes, predicciones, premios, retos, presencia, partidos, partidosFetchedAt] = await Promise.all([
+        const [participantes, predicciones, premios, retos, presencia, partidos, partidosFetchedAt, penales] = await Promise.all([
           kvGet(KV, 'participantes'),
           kvGet(KV, 'predicciones'),
           kvGet(KV, 'premios'),
@@ -234,6 +234,7 @@ export default {
           kvGet(KV, 'presencia'),
           kvGet(KV, 'partidos'),
           kvGet(KV, 'partidosFetchedAt'),
+          kvGet(KV, 'penales'),
         ]);
         return new Response(JSON.stringify({
           participantes: participantes || [],
@@ -243,12 +244,13 @@ export default {
           presencia:     presencia     || [],
           partidos:      partidos      || [],
           partidosFetchedAt: partidosFetchedAt || null,
+          penales:       penales       || [],
           chat: [], // chat viene de /api/chat, no de aqui
         }), { headers: CORS });
       }
       if (request.method === 'POST') {
         const body = await request.json();
-        const fields = ['participantes','predicciones','premios','retos','presencia','partidos','partidosFetchedAt'];
+        const fields = ['participantes','predicciones','premios','retos','presencia','partidos','partidosFetchedAt','penales'];
         await Promise.all(fields.filter(f => body[f] !== undefined).map(f => kvSet(KV, f, body[f])));
         return new Response(JSON.stringify({ ok: true }), { headers: CORS });
       }
