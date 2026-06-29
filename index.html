@@ -356,7 +356,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v8.2</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v8.3</p>
 </header>
 
 <div class="topbar">
@@ -2059,6 +2059,7 @@ let chatTimer = null;
 // Estado de un penal: 'pendiente' (esperando respuesta) | 'resuelto'
 // Cada penal: {id, de, a, zonaTiro, zonaAtajada, resultado:'gol'|'atajado', creado, resuelto}
 let penalSel = { zona:null, rival:null };
+let ultimoResultado = null; // {de, zonaTiro, zonaAtajada, resultado} — para pantalla de resultado
 
 function getMiNombre() {
   const me = (db.participantes||[]).find(p=>p.id===currentUserId);
@@ -2162,6 +2163,33 @@ async function renderJuego() {
   const { debeAtajar, otrosPendientes } = penalesEstado();
   const rachas = calcularRachas();
 
+  // PANTALLA DE RESULTADO (después de atajar) — queda fija hasta que el user la cierra
+  if(ultimoResultado) {
+    const r = ultimoResultado;
+    const ataj = r.resultado === 'atajado';
+    const gkCls = r.zonaAtajada==='izq'?'gk-dive-l':r.zonaAtajada==='der'?'gk-dive-r':'';
+    const ballCls = r.zonaTiro==='izq'?'ball-go-l':r.zonaTiro==='centro'?'ball-go-c':'ball-go-r';
+    const zNombre = z => z==='izq'?'izquierda':z==='der'?'derecha':'centro';
+    c.innerHTML = `
+      <div style="text-align:center;margin-bottom:8px">
+        <div style="font-size:32px;font-weight:700;color:${ataj?'#1d9e75':'#e24b4a'};letter-spacing:1px;line-height:1.1">
+          ${ataj?'🧤 ¡ATAJASTE!':'⚽ ¡GOOOOL!'}
+        </div>
+        <div style="font-size:12px;color:#aab8e0;margin-top:4px">
+          ${r.de} tiró a la <b style="color:#fff">${zNombre(r.zonaTiro)}</b> · vos te tiraste a la <b style="color:#fff">${zNombre(r.zonaAtajada)}</b>
+        </div>
+      </div>
+      ${svgCancha('resultado', gkCls, ballCls)}
+      <div style="text-align:center;font-size:12px;color:#c9a227;margin:8px 0">
+        Racha actual: <b>${rachas.actual[yo]||0}</b> · Mejor: <b>${rachas.mejor[yo]||0}</b>
+      </div>
+      <button class="btn-go" onclick="cerrarResultado()">
+        ${ataj?'¡A devolverle el penal! ⚽':'Tirarle un penal de vuelta ⚽'}
+      </button>`;
+    renderPenalRanking();
+    return;
+  }
+
   if(debeAtajar) {
     // Modo ATAJAR
     const z = penalSel.zona;
@@ -2225,18 +2253,19 @@ async function atajarPenal(idPenal){
   p.resultado = (p.zonaAtajada===p.zonaTiro) ? 'atajado' : 'gol';
   p.resuelto = Date.now();
   lista[idx] = p;
-  // animación corta antes de guardar
+  // animación corta antes de mostrar resultado grande
   const gkEl = document.querySelector('.gk-body');
   if(gkEl){ gkEl.classList.add(penalSel.zona==='izq'?'gk-dive-l':penalSel.zona==='der'?'gk-dive-r':''); }
   setTimeout(async ()=>{
     await guardarCampos({ penales: lista });
-    if(p.resultado==='atajado') toast('🧤 ¡Atajaste! Te toca tirarle a '+p.de);
-    else toast('⚽ Goool de '+p.de+'. Devolvele el tiro');
+    ultimoResultado = { de:p.de, zonaTiro:p.zonaTiro, zonaAtajada:p.zonaAtajada, resultado:p.resultado };
     penalSel = { zona:null, rival:null };
     await refrescarPenalesFresh();
     renderJuego(); renderPenalBanner();
   }, 700);
 }
+
+function cerrarResultado(){ ultimoResultado = null; renderJuego(); renderPenalBanner(); }
 
 function renderPenalRanking(){
   const r = document.getElementById('penales-ranking');
