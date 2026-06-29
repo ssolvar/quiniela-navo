@@ -60,6 +60,38 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 .jugados-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;background:#0d1440;border:1px solid #1a2a70;border-radius:10px;padding:11px 14px;color:#aab8e0;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s;animation:jugadosPulse 1.7s ease-in-out infinite}
 .jugados-toggle:hover{background:#141e5c}
 @keyframes jugadosPulse{0%,100%{box-shadow:0 0 0 rgba(201,162,39,0);border-color:#1a2a70}50%{box-shadow:0 0 14px rgba(201,162,39,.55);border-color:var(--do);color:var(--dos)}}
+/* === PENALES === */
+#penal-banner{margin:10px 0}
+.pban{display:flex;align-items:center;gap:10px;background:#1a1230;border:1.5px solid var(--do);border-radius:10px;padding:11px 13px;cursor:pointer;animation:pbanPulse 1.4s ease-in-out infinite;font-family:'Inter',sans-serif;text-align:left;width:100%}
+.pban-ico{font-size:22px;flex-shrink:0}
+.pban-tx{flex:1;font-size:13px;color:#fff;line-height:1.35}
+.pban-tx b{display:block;font-weight:600;color:var(--do)}
+.pban-tx small{font-size:11px;color:#aab8e0}
+.pban-arrow{color:var(--do);font-size:16px}
+@keyframes pbanPulse{0%,100%{box-shadow:0 0 0 rgba(201,162,39,0);background:#1a1230}50%{box-shadow:0 0 16px rgba(201,162,39,.55);background:#241742}}
+.cancha{width:100%;aspect-ratio:16/9;max-height:230px;background:#0a0e27;border-radius:10px;display:block;margin-bottom:10px}
+.zbtn-row{display:flex;gap:6px;margin-bottom:10px}
+.zbtn{flex:1;padding:10px;border-radius:8px;background:#0d1440;border:1.5px solid #1a2a70;color:#aab8e0;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s}
+.zbtn:hover{border-color:var(--do);color:var(--do)}
+.zbtn.sel{background:rgba(201,162,39,.15);border-color:var(--do);color:var(--do)}
+.btn-go{width:100%;padding:11px;border:none;border-radius:8px;background:var(--do);color:#0a0e27;font-family:'Inter',sans-serif;font-size:14px;font-weight:600;cursor:pointer}
+.btn-go:disabled{opacity:.4;cursor:not-allowed}
+.btn-go.aja{background:#1d9e75}
+.rival-pick{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px;margin-bottom:10px}
+.rival-btn{padding:9px 6px;border-radius:7px;background:#0d1440;border:1px solid #1a2a70;color:#aab8e0;font-family:'Inter',sans-serif;font-size:12px;cursor:pointer;text-align:center}
+.rival-btn:hover{border-color:var(--do)}
+.rival-btn.sel{background:rgba(201,162,39,.15);border-color:var(--do);color:var(--do);font-weight:600}
+.rival-btn.dis{opacity:.4;cursor:not-allowed;text-decoration:line-through}
+.rival-btn small{display:block;font-size:10px;color:#6677aa;margin-top:2px}
+.pen-row{display:flex;align-items:center;justify-content:space-between;background:#0d1440;border-radius:7px;padding:8px 12px;margin-bottom:5px;font-family:'Inter',sans-serif;font-size:13px;color:#fff}
+.pen-row .medal{margin-right:5px}
+.pen-row small{color:#aab8e0;font-size:11px}
+.gk-body,.ball-body{transition:transform 1s ease-out}
+.gk-dive-l{transform:translate(-60px,8px) rotate(-55deg)}
+.gk-dive-r{transform:translate(60px,8px) rotate(55deg)}
+.ball-go-l{transform:translate(-92px,-30px) scale(.55)}
+.ball-go-c{transform:translate(0,-35px) scale(.55)}
+.ball-go-r{transform:translate(92px,-30px) scale(.55)}
 .jugados-count{background:#1a2a70;color:var(--do);border-radius:12px;padding:2px 9px;font-size:12px;font-weight:700}
 .jugados-list{margin-top:8px}
 .reto-titulo{font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--do);letter-spacing:1px;margin-bottom:4px}
@@ -324,7 +356,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v7.8</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v7.9</p>
 </header>
 
 <div class="topbar">
@@ -349,6 +381,8 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 <div id="tab-tabla" class="panel active">
   <!-- RETO ACTIVO -->
   <div id="reto-principal"></div>
+  <!-- AVISO DE PENAL -->
+  <div id="penal-banner" style="display:none"></div>
   <!-- CHAT -->
   <div class="chat-wrap">
     <div class="chat-title">💬 Chat del grupo</div>
@@ -387,6 +421,19 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
   <div class="card"><h2>📋 Mis predicciones</h2><div id="preds-cont"></div></div>
 </div>
 
+<div id="tab-juego" class="panel">
+  <div class="card">
+    <h2>🥅 Duelo de penales</h2>
+    <p style="font-size:12px;color:#8899cc;margin-bottom:10px">No suma a la quiniela. Solo por diversión y la racha.</p>
+    <div id="juego-cont"></div>
+  </div>
+  <div class="card">
+    <h2>🏆 Mejores rachas</h2>
+    <p style="font-size:12px;color:#8899cc;margin-bottom:10px">Atajadas seguidas sin recibir gol</p>
+    <div id="penales-ranking"></div>
+  </div>
+</div>
+
 <div id="tab-grupo" class="panel">
   <div class="card"><h2>👤 Mi perfil</h2><div id="mi-perfil-cont"></div></div>
   <div id="grupo-admin-cont"></div>
@@ -422,6 +469,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
   <button class="tab" id="tnav-partidos" onclick="showTab('partidos')"><span class="tab-icon">⚽</span>Partidos</button>
   <button class="tab" id="tnav-bracket" onclick="showTab('bracket')"><span class="tab-icon">🏟️</span>Bracket</button>
   <button class="tab" id="tnav-predicciones" onclick="showTab('predicciones')"><span class="tab-icon">🎯</span>Predecir</button>
+  <button class="tab" id="tnav-juego" onclick="showTab('juego')"><span class="tab-icon">🥅</span>Juego</button>
   <button class="tab" id="tnav-grupo" onclick="showTab('grupo')"><span class="tab-icon">👥</span>Grupo</button>
   <button class="tab" id="tnav-mundial" onclick="showTab('mundial')"><span class="tab-icon">🌍</span>Mundial</button>
   <button class="tab" id="tnav-premios" onclick="showTab('premios')"><span class="tab-icon">🎁</span>Premios</button>
@@ -1999,6 +2047,189 @@ function renderStandings() {
 // =============================================
 let chatTimer = null;
 
+// ============================================================
+// JUEGO DE PENALES
+// ============================================================
+// Reglas:
+// - Tiro 1 penal a cada persona (no varios al mismo hasta que me devuelva).
+// - Solo atajo si me tiraron.
+// - Racha = atajadas consecutivas sin recibir gol. Se guarda la MEJOR.
+// Estado de un penal: 'pendiente' (esperando respuesta) | 'resuelto'
+// Cada penal: {id, de, a, zonaTiro, zonaAtajada, resultado:'gol'|'atajado', creado, resuelto}
+let penalSel = { zona:null, rival:null };
+
+function getMiNombre() {
+  const me = (db.participantes||[]).find(p=>p.id===currentUserId);
+  return me ? me.nombre : null;
+}
+
+function penalesEstado() {
+  const yo = getMiNombre();
+  if(!yo) return { miPendiente:null, debeAtajar:null, otrosPendientes:[] };
+  const lista = db.penales || [];
+  // penal pendiente que ME tiraron (yo debo atajar)
+  const debeAtajar = lista.find(p=>p.a===yo && !p.resuelto);
+  // a quién YA le tiré (esperando respuesta) — para bloquear re-tiros
+  const otrosPendientes = lista.filter(p=>p.de===yo && !p.resuelto).map(p=>p.a);
+  return { debeAtajar, otrosPendientes };
+}
+
+function calcularRachas() {
+  // Mejor racha de atajadas consecutivas por jugador
+  const lista = (db.penales||[]).filter(p=>p.resuelto).slice().sort((a,b)=>a.resuelto-b.resuelto);
+  const cur={}, max={};
+  lista.forEach(p=>{
+    const v=p.a;
+    if(!(v in cur)){cur[v]=0;max[v]=0;}
+    if(p.resultado==='atajado'){ cur[v]++; if(cur[v]>max[v]) max[v]=cur[v]; }
+    else cur[v]=0;
+  });
+  return { actual:cur, mejor:max };
+}
+
+function renderPenalBanner() {
+  const el = document.getElementById('penal-banner');
+  if(!el) return;
+  const yo = getMiNombre();
+  if(!yo || !currentUserId) { el.style.display='none'; return; }
+  const { debeAtajar, otrosPendientes } = penalesEstado();
+  const participantes = (db.participantes||[]).filter(p=>p.nombre!==yo);
+  const puedeTirarA = participantes.filter(p=>!otrosPendientes.includes(p.nombre));
+  if(debeAtajar){
+    el.style.display='block';
+    el.innerHTML = `<button class="pban" onclick="showTab('juego')">
+      <span class="pban-ico">🥅</span>
+      <span class="pban-tx"><b>${debeAtajar.de} te tiró un penal</b><small>tocá para atajarlo</small></span>
+      <span class="pban-arrow">›</span></button>`;
+  } else if(puedeTirarA.length){
+    el.style.display='block';
+    el.innerHTML = `<button class="pban" onclick="showTab('juego')">
+      <span class="pban-ico">⚽</span>
+      <span class="pban-tx"><b>Te toca tirar un penal</b><small>${puedeTirarA.length} ${puedeTirarA.length===1?'rival disponible':'rivales disponibles'}</small></span>
+      <span class="pban-arrow">›</span></button>`;
+  } else {
+    el.style.display='none';
+  }
+}
+
+function svgCancha(modo, gkClass, ballClass){
+  // modo: 'tirar' o 'atajar' — solo cambia colorcito de zonas
+  return `<svg class="cancha" viewBox="0 0 300 170" preserveAspectRatio="xMidYMid meet">
+    <rect x="0" y="0" width="300" height="170" fill="#0d3b1a"/>
+    <ellipse cx="150" cy="162" rx="160" ry="22" fill="#0f4a22"/>
+    <rect x="40" y="32" width="220" height="80" fill="#10204a" stroke="#e6ecff" stroke-width="2.5"/>
+    <g stroke="#5a6aa8" stroke-width="0.5" opacity="0.7">
+      ${[55,70,85,100,115,130,145,160,175,190,205,220,235,250].map(x=>`<line x1="${x}" y1="34" x2="${x}" y2="110"/>`).join('')}
+      ${[46,60,74,88,102].map(y=>`<line x1="42" y1="${y}" x2="258" y2="${y}"/>`).join('')}
+    </g>
+    <g class="gk-body ${gkClass||''}" style="transform-origin:150px 88px">
+      <ellipse cx="150" cy="106" rx="14" ry="3.5" fill="#000" opacity="0.22"/>
+      <circle cx="150" cy="82" r="7.5" fill="#f1c27d"/>
+      <rect x="141" y="71" width="18" height="6" rx="3" fill="#c9a227"/>
+      <path d="M134 110 Q138 90 150 88 Q162 90 166 110 Z" fill="#1d9e75"/>
+      <rect x="123" y="91" width="14" height="6" rx="3" fill="#1d9e75" transform="rotate(-32 130 94)"/>
+      <rect x="163" y="91" width="14" height="6" rx="3" fill="#1d9e75" transform="rotate(32 170 94)"/>
+      <rect x="143" y="110" width="14" height="3" fill="#0a0e27"/>
+    </g>
+    <g class="ball-body ${ballClass||''}" style="transform-origin:150px 138px">
+      <circle cx="150" cy="138" r="6" fill="#fff" stroke="#222" stroke-width="0.8"/>
+      <path d="M150 132 l2.5 3.5 -1 3.5 h-3 l-1 -3.5 z" fill="#222"/>
+    </g>
+  </svg>`;
+}
+
+function renderJuego() {
+  const c = document.getElementById('juego-cont');
+  if(!c) return;
+  if(!currentUserId) { c.innerHTML='<div style="text-align:center;padding:20px;color:#8899cc;font-size:13px">Ingresa con tu PIN para jugar</div>'; renderPenalRanking(); return; }
+  const yo = getMiNombre();
+  const { debeAtajar, otrosPendientes } = penalesEstado();
+  const rachas = calcularRachas();
+
+  if(debeAtajar) {
+    // Modo ATAJAR
+    const z = penalSel.zona;
+    const ballCls = z==='izq'?'ball-go-l':z==='centro'?'ball-go-c':z==='der'?'ball-go-r':'';
+    c.innerHTML = `<div style="background:#1a1230;border-left:3px solid var(--do);border-radius:8px;padding:9px 11px;margin-bottom:10px;display:flex;align-items:center;gap:8px">
+        <span style="font-size:20px">🔔</span>
+        <div style="font-size:12px;color:#fff;line-height:1.4"><b style="font-weight:600">${debeAtajar.de} te tiró un penal</b><br><span style="color:#aab8e0;font-size:11px">elegí dónde tirarte</span></div>
+      </div>
+      ${svgCancha('atajar', '', ballCls)}
+      <div class="zbtn-row">
+        <button class="zbtn ${z==='izq'?'sel':''}" onclick="elegirZona('izq')">← izq</button>
+        <button class="zbtn ${z==='centro'?'sel':''}" onclick="elegirZona('centro')">⊙ centro</button>
+        <button class="zbtn ${z==='der'?'sel':''}" onclick="elegirZona('der')">der →</button>
+      </div>
+      <button class="btn-go aja" ${z?'':'disabled'} onclick="atajarPenal('${debeAtajar.id}')">Atajar</button>
+      <p style="font-size:11px;color:#8899cc;text-align:center;margin-top:8px">Racha actual: ${rachas.actual[yo]||0} · Mejor: ${rachas.mejor[yo]||0}</p>`;
+  } else {
+    // Modo TIRAR
+    const participantes = (db.participantes||[]).filter(p=>p.nombre!==yo);
+    if(!participantes.length) { c.innerHTML='<div style="text-align:center;padding:20px;color:#8899cc;font-size:13px">No hay otros participantes para jugar</div>'; renderPenalRanking(); return; }
+    const z = penalSel.zona, rv = penalSel.rival;
+    const ballCls = z==='izq'?'ball-go-l':z==='centro'?'ball-go-c':z==='der'?'ball-go-r':'';
+    c.innerHTML = `${svgCancha('tirar', '', ballCls)}
+      <div style="font-size:11px;color:#aab8e0;margin-bottom:6px">Elegí a quién tirarle:</div>
+      <div class="rival-pick">${participantes.map(p=>{
+        const blq=otrosPendientes.includes(p.nombre);
+        return `<button class="rival-btn ${rv===p.nombre?'sel':''} ${blq?'dis':''}" ${blq?'disabled':''} onclick="elegirRival('${p.nombre.replace(/'/g,"\\'")}')">${p.nombre}${blq?'<small>esperando…</small>':''}</button>`;
+      }).join('')}</div>
+      <div style="font-size:11px;color:#aab8e0;margin:10px 0 6px">Elegí la zona:</div>
+      <div class="zbtn-row">
+        <button class="zbtn ${z==='izq'?'sel':''}" onclick="elegirZona('izq')">← izq</button>
+        <button class="zbtn ${z==='centro'?'sel':''}" onclick="elegirZona('centro')">⊙ centro</button>
+        <button class="zbtn ${z==='der'?'sel':''}" onclick="elegirZona('der')">der →</button>
+      </div>
+      <button class="btn-go" ${(z&&rv)?'':'disabled'} onclick="tirarPenal()">Tirar el penal${rv?' a '+rv:''}</button>`;
+  }
+  renderPenalRanking();
+}
+
+function elegirZona(z){ penalSel.zona=z; renderJuego(); }
+function elegirRival(r){ penalSel.rival=r; renderJuego(); }
+
+async function tirarPenal(){
+  const yo=getMiNombre(); if(!yo||!penalSel.zona||!penalSel.rival) return;
+  const penal = { id:'p'+Date.now()+Math.random().toString(36).slice(2,6), de:yo, a:penalSel.rival, zonaTiro:penalSel.zona, creado:Date.now(), resuelto:null };
+  const lista = (db.penales||[]).concat(penal);
+  await guardarCampos({ penales: lista });
+  toast('⚽ ¡Penal enviado a '+penalSel.rival+'!');
+  penalSel = { zona:null, rival:null };
+  renderJuego(); renderPenalBanner();
+}
+
+async function atajarPenal(idPenal){
+  const yo=getMiNombre(); if(!yo||!penalSel.zona) return;
+  const lista = (db.penales||[]).slice();
+  const idx = lista.findIndex(p=>p.id===idPenal);
+  if(idx<0) return;
+  const p = {...lista[idx]};
+  p.zonaAtajada = penalSel.zona;
+  p.resultado = (p.zonaAtajada===p.zonaTiro) ? 'atajado' : 'gol';
+  p.resuelto = Date.now();
+  lista[idx] = p;
+  // animación corta antes de guardar
+  const gkEl = document.querySelector('.gk-body');
+  if(gkEl){ gkEl.classList.add(penalSel.zona==='izq'?'gk-dive-l':penalSel.zona==='der'?'gk-dive-r':''); }
+  setTimeout(async ()=>{
+    await guardarCampos({ penales: lista });
+    if(p.resultado==='atajado') toast('🧤 ¡Atajaste! Te toca tirarle a '+p.de);
+    else toast('⚽ Goool de '+p.de+'. Devolvele el tiro');
+    penalSel = { zona:null, rival:null };
+    renderJuego(); renderPenalBanner();
+  }, 700);
+}
+
+function renderPenalRanking(){
+  const r = document.getElementById('penales-ranking');
+  if(!r) return;
+  const rachas = calcularRachas();
+  const lista = Object.entries(rachas.mejor).map(([n,m])=>({n,m,actual:rachas.actual[n]||0})).sort((a,b)=>b.m-a.m||b.actual-a.actual);
+  if(!lista.length){ r.innerHTML='<div style="text-align:center;padding:10px;color:#8899cc;font-size:12px">Sin penales todavía</div>'; return; }
+  const med=['🥇','🥈','🥉'];
+  r.innerHTML = lista.map((x,i)=>`<div class="pen-row"><span><span class="medal">${med[i]||'·'}</span>${x.n}</span><small>${x.m} mejor racha · ${x.actual} actual</small></div>`).join('');
+}
+
 function renderChat() {
   const msgs = document.getElementById('chat-msgs');
   const inputWrap = document.getElementById('chat-input-wrap');
@@ -2202,11 +2433,13 @@ function renderAll(){
   aplicarRol();
   renderOnline();
   renderRetoPrincipal();
+  renderPenalBanner();
   renderChat();
   renderTabla();
   renderPartidos();
   renderBracket();
   renderPredicciones();
+  renderJuego();
   renderMiPerfil();
   renderParticipantes();
   renderPremios();
