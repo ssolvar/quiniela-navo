@@ -374,7 +374,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v9.8</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v10.0</p>
 </header>
 
 <div class="topbar">
@@ -2137,14 +2137,20 @@ function estadoContraRival(yo, otro) {
     return { bloqueado:true, motivo:'esperando que '+otro+' ataje' };
   }
   // Último resuelto → le toca tirar al receptor de ese tiro...
-  // a menos que sean exactamente múltiplos de tanda (10, 20...) y esté cerrada.
+  // a menos que la tanda esté cerrada o YO ya la haya confirmado (Salir).
   if(ultimo.a === yo) {
     const deMi = lista.filter(p => p.de===yo && p.resuelto).length;
     const deOtro = lista.filter(p => p.de===otro && p.resuelto).length;
     const total = deMi + deOtro;
-    const esMultiploDeTanda = (total > 0 && total % 10 === 0);
-    if(esMultiploDeTanda && deMi === deOtro && par && !par.pendiente) {
-      return { puedeIniciar:true }; // tanda cerrada exacta, cualquiera puede reiniciar
+    if(total > 0 && total % 10 === 0 && deMi === deOtro) {
+      // ¿Tanda cerrada por ambos o yo ya confirmé?
+      const numTanda = total / 10;
+      const yoConfirme = (db.tandasConfirm||[]).some(c =>
+        c.par===(([yo,otro].sort()).join('|')) && c.numTanda===numTanda && c.vistos.includes(yo)
+      );
+      if(!par || !par.pendiente || yoConfirme) {
+        return { puedeIniciar:true }; // fuera del ciclo
+      }
     }
     return { debeTirar:true };
   }
@@ -2430,28 +2436,11 @@ async function renderJuego() {
       <div style="font-size:11px;color:#8899cc;margin-bottom:6px">Detalle de la tanda:</div>
       ${filas}
       <button class="btn-go" style="margin-top:10px" onclick="confirmarTanda('${s.parKey}', ${t.numTanda})">
-        ${empate ? 'Reiniciar y a jugar ⚽' : 'Vamos por la revancha ⚽'}
+        🚪 Salir
       </button>
       <p style="font-size:11px;color:${otroVisto?'#1d9e75':'#8899cc'};text-align:center;margin-top:8px">
         ${otroVisto ? '✅ '+rival+' ya vio el resumen' : '⏳ esperando que '+rival+' también vea el resumen'}
       </p>`;
-    renderPenalRanking();
-    return;
-  }
-
-  // PANTALLA DE ELECCIÓN POST-TANDA — ambos confirmaron, ¿seguir o salir?
-  if(elegiendoContinuar) {
-    const rival = elegiendoContinuar.rival;
-    c.innerHTML = `
-      <div style="text-align:center;padding:20px 0">
-        <div style="font-size:40px;margin-bottom:10px">🏁</div>
-        <div style="font-size:18px;font-weight:700;color:#fff;margin-bottom:6px">Tanda ${elegiendoContinuar.numTanda} vs ${rival} revisada</div>
-        <div style="font-size:13px;color:#aab8e0;margin-bottom:20px">¿Querés seguir jugando contra ${rival}?</div>
-        <div style="display:flex;gap:10px;justify-content:center">
-          <button class="btn-go" style="flex:1;max-width:160px" onclick="continuarJugando('${rival.replace(/'/g,"\\'")}')">✅ Seguir jugando</button>
-          <button class="btn" style="flex:1;max-width:160px;background:#c8102e;color:#fff;border:none;border-radius:8px;padding:11px;font-family:'Inter',sans-serif;font-size:14px;font-weight:600;cursor:pointer" onclick="salirDelJuego()">🚪 Salir</button>
-        </div>
-      </div>`;
     renderPenalRanking();
     return;
   }
@@ -2602,9 +2591,7 @@ async function atajarPenal(idPenal){
 
 function cerrarResultado(){ ultimoResultado = null; renderJuego(); renderPenalBanner(); }
 
-// Marca a `yo` como "visto" para una tanda específica. Cuando ambos confirmaron,
-// se muestra pantalla de elección (¿seguir o salir?) para no seguir infinito.
-let elegiendoContinuar = null; // {parKey, numTanda, rival} — pantalla de elección post-tanda
+// Marca a `yo` como "visto" y saca al jugador del ciclo.
 async function confirmarTanda(parKey, numTanda) {
   const yo = getMiNombre(); if(!yo) return;
   const lista = (db.tandasConfirm || []).slice();
@@ -2613,26 +2600,10 @@ async function confirmarTanda(parKey, numTanda) {
   if(!entry.vistos.includes(yo)) entry.vistos.push(yo);
   await guardarCampos({ tandasConfirm: lista });
   await refrescarPenalesFresh();
-  const rival = parKey.split('|').find(n => n!==yo);
-  // Si ambos ya confirmaron, mostrar pantalla de elección
-  if(entry.vistos.length >= 2) {
-    elegiendoContinuar = { parKey, numTanda, rival };
-  }
-  toast('✅ Resultado visto');
-  renderJuego(); renderPenalBanner();
-}
-
-async function continuarJugando(rival) {
-  elegiendoContinuar = null;
-  penalSel = { zona:null, rival:rival };
-  ultimoResultado = null;
-  renderJuego(); renderPenalBanner();
-}
-
-function salirDelJuego() {
-  elegiendoContinuar = null;
+  // Salir al modo libre
   penalSel = { zona:null, rival:null };
   ultimoResultado = null;
+  toast('✅ Resultado visto');
   renderJuego(); renderPenalBanner();
 }
 
