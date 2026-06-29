@@ -89,6 +89,20 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 .serie-vs{flex:1}
 .serie-vs b{color:#fff;font-weight:600}
 .serie-meta{font-size:11px;color:var(--do);font-weight:600;white-space:nowrap}
+/* === TARJETAS DE TANDA (5 bolitas por jugador) === */
+.t-section{font-size:11px;color:#aab8e0;margin:6px 0 6px;letter-spacing:.3px}
+.tarjeta-tanda{background:#0d1440;border:1px solid #1a2a70;border-radius:10px;padding:8px 12px;margin-bottom:8px;font-family:'Inter',sans-serif}
+.tarjeta-tanda.tono-pendiente{border-color:var(--do);box-shadow:0 0 8px rgba(201,162,39,.18)}
+.tarjeta-tanda.tono-cerrada{opacity:.85;border-color:#172048;background:#0a0e27}
+.t-tag{font-size:10px;color:#c9a227;letter-spacing:.3px;margin-bottom:6px;text-transform:uppercase;font-weight:600}
+.t-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:3px 0}
+.t-name{flex:0 0 auto;min-width:80px;max-width:120px;font-size:13px;color:#fff;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.t-balls{flex:1;display:flex;justify-content:center;gap:4px}
+.t-score{flex:0 0 auto;font-size:15px;font-weight:700;color:var(--do);min-width:18px;text-align:right}
+.ball{display:inline-block;width:14px;height:14px;border-radius:50%;border:1.5px solid #2a3a80;background:transparent}
+.ball-gol{background:#1d9e75;border-color:#1d9e75;box-shadow:0 0 6px rgba(29,158,117,.5)}
+.ball-fail{background:#e24b4a;border-color:#e24b4a}
+.ball-empty{background:transparent;border-color:#2a3a80}
 .gk-body,.ball-body{transition:transform 1s ease-out}
 .gk-dive-l{transform:translate(-60px,8px) rotate(-55deg)}
 .gk-dive-r{transform:translate(60px,8px) rotate(55deg)}
@@ -360,7 +374,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v8.7</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v8.8</p>
 </header>
 
 <div class="topbar">
@@ -707,19 +721,10 @@ async function guardarCampos(campos) {
 }
 
 // Al entrar: forzar la actualización de TODAS las APIs (partidos, db, standings, goleadores)
-// Limpieza única al subir a v8.6: los penales viejos no tienen estructura de series y
-// quedaron con ruido de pruebas (bugs del centro, etc.). Si no hay flag _v8, se borran.
-async function migrarPenalesV8() {
-  try {
-    const lista = db.penales || [];
-    if(!lista.length) return; // nada que limpiar
-    const yaMigrado = lista.every(p => p._v === 8);
-    if(yaMigrado) return;
-    // Vaciar penales (solo del campo penales — no toca nada más)
-    await guardarCampos({ penales: [] });
-    db.penales = [];
-  } catch(e) { console.error('migrarPenalesV8:', e); }
-}
+// Migración de v8.6 (limpieza única de penales viejos) — DESACTIVADA.
+// Causaba pérdida de datos porque se ejecutaba más de una vez. Si en el futuro
+// hace falta una limpieza, hacerla manualmente desde la consola.
+async function migrarPenalesV8() { /* noop */ }
 
 async function precargarTodo() {
   setSyncStatus('loading');
@@ -2087,19 +2092,29 @@ function getMiNombre() {
 
 function penalesEstado() {
   const yo = getMiNombre();
-  if(!yo) return { miPendiente:null, debeAtajar:null, otrosPendientes:[], esperaConfirmYo:[], pendientesParaConfirmar:[] };
+  if(!yo) return { miPendiente:null, debeAtajar:null, otrosPendientes:[], esperaConfirmYo:[], pendientesParaConfirmar:[], debeDevolverA:null };
   const lista = db.penales || [];
-  // penal pendiente que ME tiraron (yo debo atajar)
-  const debeAtajar = lista.find(p=>p.a===yo && !p.resuelto);
+  // penal pendiente que ME tiraron (yo debo atajar) — FIFO: el más viejo primero
+  const debeAtajar = lista.filter(p=>p.a===yo && !p.resuelto).sort((a,b)=>(a.creado||0)-(b.creado||0))[0] || null;
   // a quién YA le tiré (esperando respuesta) — para bloquear re-tiros por penal en curso
   const otrosPendientes = lista.filter(p=>p.de===yo && !p.resuelto).map(p=>p.a);
-  // Rivales con tanda pendiente de confirmar (no se puede tirar nuevos hasta que ambos vean el resumen)
+  // Rivales con tanda pendiente de confirmar
   const series = calcularSeries();
   const tandasMias = series.filter(s => (s.a===yo||s.b===yo) && s.pendiente);
-  const esperaConfirmYo = tandasMias.map(s => s.a===yo ? s.b : s.a); // rivales que me bloquean
-  // Tandas pendientes que YO todavía no marqué como vista (para mostrar el resumen)
+  const esperaConfirmYo = tandasMias.map(s => s.a===yo ? s.b : s.a);
   const pendientesParaConfirmar = tandasMias.filter(s => !s.pendiente.vistos.includes(yo));
-  return { debeAtajar, otrosPendientes, esperaConfirmYo, pendientesParaConfirmar };
+  // DEUDA: penales resueltos donde alguien me tiró Y todavía no le devolví uno DESPUÉS de esa atajada.
+  // FIFO: la deuda más vieja primero. Devolverle a X = tirarle un penal a X (resuelto o pendiente)
+  // CREADO después del último penal que X me tiró.
+  const ordenado = lista.slice().sort((a,b)=>(a.resuelto||a.creado||0)-(b.resuelto||b.creado||0));
+  const meTiraron = ordenado.filter(p=>p.resuelto && p.a===yo); // penales que me tiraron y se resolvieron
+  let debeDevolverA = null;
+  for(const p of meTiraron) {
+    // ¿Le devolví ya algo a p.de después de esta atajada/gol?
+    const yaDevolvi = lista.some(q => q.de===yo && q.a===p.de && (q.creado||0) > (p.resuelto||0));
+    if(!yaDevolvi) { debeDevolverA = p.de; break; }
+  }
+  return { debeAtajar, otrosPendientes, esperaConfirmYo, pendientesParaConfirmar, debeDevolverA };
 }
 
 function calcularStats() {
@@ -2117,12 +2132,10 @@ function calcularStats() {
   return s;
 }
 
-// Agrupa los penales RESUELTOS por par de jugadores en series ("tandas") de 5.
-// Cada par puede tener:
-//   - cerradas: tandas ya confirmadas por AMBOS (van al historial)
-//   - pendiente: tanda recién completada (5 penales) esperando que ambos confirmen "visto"
-//   - actual:    tanda en curso (0-4 penales jugados)
-// Solo puede haber UNA pendiente por par a la vez — bloquea tiros nuevos.
+// Agrupa los penales RESUELTOS por par de jugadores en TANDAS.
+// Una tanda son 5 tiros DE CADA UNO (no 5 entre los dos). Total 10 tiros por tanda.
+// El score sube cuando vos tirás y la metés (gol). Atajar no suma.
+// La tanda se cierra cuando AMBOS completaron sus 5 tiros, queda pendiente de revisión.
 function calcularSeries() {
   const porPar = {};
   (db.penales||[]).filter(p=>p.resuelto).sort((x,y)=>x.resuelto-y.resuelto).forEach(p => {
@@ -2131,40 +2144,52 @@ function calcularSeries() {
     if(!porPar[key]) porPar[key] = { a, b, lista:[] };
     porPar[key].lista.push(p);
   });
-  // Lista de confirmaciones de tandas: { par:'A|B', numTanda:1, vistos:['A','B'] }
-  // Se guarda en db.tandasConfirm para persistir entre sesiones
   const confirms = db.tandasConfirm || [];
   const confKey = (parKey, n) => confirms.find(c => c.par===parKey && c.numTanda===n);
+
   return Object.values(porPar).map(par => {
     const parKey = par.a + '|' + par.b;
-    const cerradas = []; // confirmadas por ambos
-    let pendiente = null; // completada, esperando vistos
-    let actual = { a:par.a, b:par.b, golesA:0, golesB:0, jugados:0, penales:[] };
+    const cerradas = [];
+    let pendiente = null;
+    // tirosA / tirosB = lista de booleans (true=gol, false=atajado) por cada tiro DE ese jugador
+    let actual = { a:par.a, b:par.b, tirosA:[], tirosB:[], penales:[] };
     let numTanda = 1;
-    for(const p of par.lista) {
-      actual.jugados++;
-      actual.penales.push(p);
-      if(p.resultado === 'gol') {
-        if(p.de === par.a) actual.golesA++; else actual.golesB++;
-      }
-      if(actual.jugados >= 5) {
-        const ganador = actual.golesA === actual.golesB ? null
-                       : (actual.golesA > actual.golesB ? par.a : par.b);
+
+    const cerrarSiCompleta = () => {
+      if(actual.tirosA.length >= 5 && actual.tirosB.length >= 5) {
+        const golesA = actual.tirosA.filter(x=>x).length;
+        const golesB = actual.tirosB.filter(x=>x).length;
+        const ganador = golesA === golesB ? null : (golesA > golesB ? par.a : par.b);
         const conf = confKey(parKey, numTanda);
-        const cierreVistos = conf ? conf.vistos : [];
-        const ambosVieron = cierreVistos.includes(par.a) && cierreVistos.includes(par.b);
+        const vistos = conf ? conf.vistos : [];
+        const ambosVieron = vistos.includes(par.a) && vistos.includes(par.b);
         if(ambosVieron) {
-          cerradas.push({ ...actual, ganador, numTanda, vistos:cierreVistos });
+          cerradas.push({ ...actual, golesA, golesB, ganador, numTanda, vistos });
           numTanda++;
-          actual = { a:par.a, b:par.b, golesA:0, golesB:0, jugados:0, penales:[] };
+          actual = { a:par.a, b:par.b, tirosA:[], tirosB:[], penales:[] };
         } else {
-          // queda pendiente — paramos acá, no procesamos más penales hasta confirmar
-          pendiente = { ...actual, ganador, numTanda, vistos:cierreVistos, parKey };
-          // los penales posteriores se ignoran (no se debe poder tirar más, pero por seguridad)
-          break;
+          pendiente = { ...actual, golesA, golesB, ganador, numTanda, vistos, parKey };
+          return true; // detener procesamiento hasta confirmación
         }
       }
+      return false;
+    };
+
+    for(const p of par.lista) {
+      const fueGol = p.resultado === 'gol';
+      if(p.de === par.a) {
+        if(actual.tirosA.length >= 5) continue; // no debería pasar, pero seguro
+        actual.tirosA.push(fueGol);
+      } else {
+        if(actual.tirosB.length >= 5) continue;
+        actual.tirosB.push(fueGol);
+      }
+      actual.penales.push(p);
+      if(cerrarSiCompleta()) break;
     }
+    // Goles "en juego" de la tanda actual
+    actual.golesA = actual.tirosA.filter(x=>x).length;
+    actual.golesB = actual.tirosB.filter(x=>x).length;
     return { a:par.a, b:par.b, parKey, numTanda, cerradas, pendiente, actual };
   });
 }
@@ -2257,7 +2282,7 @@ async function renderJuego() {
   // Asegurar que el estado de penales esté al día antes de pintar (regla: 1 tiro por rival pendiente)
   await refrescarPenalesFresh();
   const yo = getMiNombre();
-  const { debeAtajar, otrosPendientes, pendientesParaConfirmar, esperaConfirmYo } = penalesEstado();
+  const { debeAtajar, otrosPendientes, pendientesParaConfirmar, esperaConfirmYo, debeDevolverA } = penalesEstado();
   const stats = calcularStats();
 
   // RESUMEN DE TANDA TERMINADA — esperando que YO la marque como vista.
@@ -2291,11 +2316,21 @@ async function renderJuego() {
       </div>`;
     }).join('');
     const otroVisto = t.vistos.includes(rival);
+    // Bolitas de cada uno
+    const bolitas = (tiros) => Array.from({length:5}).map((_,i) => {
+      if(i < tiros.length) return tiros[i] ? '<span class="ball ball-gol"></span>' : '<span class="ball ball-fail"></span>';
+      return '<span class="ball ball-empty"></span>';
+    }).join('');
+    const visualTanda = `<div style="background:#0d1440;border-radius:8px;padding:10px;margin:8px 0">
+      <div class="t-row"><span class="t-name">${s.a}</span><span class="t-balls">${bolitas(t.tirosA)}</span><span class="t-score">${t.golesA}</span></div>
+      <div class="t-row"><span class="t-name">${s.b}</span><span class="t-balls">${bolitas(t.tirosB)}</span><span class="t-score">${t.golesB}</span></div>
+    </div>`;
     c.innerHTML = `
       <div style="text-align:center;margin-bottom:10px">${cabecera}</div>
-      <div style="text-align:center;font-size:38px;font-weight:700;color:#fff;margin:5px 0 10px;letter-spacing:2px">
+      <div style="text-align:center;font-size:38px;font-weight:700;color:#fff;margin:5px 0 6px;letter-spacing:2px">
         ${golesYo} - ${golesRival}
       </div>
+      ${visualTanda}
       <div style="font-size:11px;color:#8899cc;margin-bottom:6px">Detalle de la tanda:</div>
       ${filas}
       <button class="btn-go" style="margin-top:10px" onclick="confirmarTanda('${s.parKey}', ${t.numTanda})">
@@ -2335,7 +2370,28 @@ async function renderJuego() {
     return;
   }
 
-  if(debeAtajar) {
+  // PRIORIDAD ESTRICTA (cola FIFO):
+  // 1) Si debo devolver un tiro → forzar tirar a esa persona (no se puede atajar ni elegir otro rival)
+  // 2) Si NO debo nada → atajar lo entrante
+  // 3) Si no hay nada que atajar → tirar libremente
+  if(debeDevolverA && !ultimoResultado) {
+    // Modo DEVOLVER — rival fijo, sin opción de cambiar
+    penalSel.rival = debeDevolverA;
+    const z = penalSel.zona;
+    const ballCls = z==='izq'?'ball-go-l':z==='centro'?'ball-go-c':z==='der'?'ball-go-r':'';
+    c.innerHTML = `<div style="background:#1a1230;border-left:3px solid var(--do);border-radius:8px;padding:9px 11px;margin-bottom:10px;display:flex;align-items:center;gap:8px">
+        <span style="font-size:20px">↩️</span>
+        <div style="font-size:12px;color:#fff;line-height:1.4"><b style="font-weight:600">Devolvele el penal a ${debeDevolverA}</b><br><span style="color:#aab8e0;font-size:11px">tenés que tirarle antes de seguir</span></div>
+      </div>
+      ${svgCancha('tirar', '', ballCls)}
+      <div style="font-size:11px;color:#aab8e0;margin:6px 0">Elegí la zona:</div>
+      <div class="zbtn-row">
+        <button class="zbtn ${z==='izq'?'sel':''}" onclick="elegirZona('izq')">← izq</button>
+        <button class="zbtn ${z==='centro'?'sel':''}" onclick="elegirZona('centro')">⊙ centro</button>
+        <button class="zbtn ${z==='der'?'sel':''}" onclick="elegirZona('der')">der →</button>
+      </div>
+      <button class="btn-go" ${z?'':'disabled'} onclick="tirarPenal()">Tirarle el penal a ${debeDevolverA}</button>`;
+  } else if(debeAtajar) {
     // Modo ATAJAR
     const z = penalSel.zona;
     const ballCls = z==='izq'?'ball-go-l':z==='centro'?'ball-go-c':z==='der'?'ball-go-r':'';
@@ -2352,7 +2408,7 @@ async function renderJuego() {
       <button class="btn-go aja" ${z?'':'disabled'} onclick="atajarPenal('${debeAtajar.id}')">Atajar</button>
       <p style="font-size:11px;color:#8899cc;text-align:center;margin-top:8px">Goles: ${(stats[yo]&&stats[yo].goles)||0} · Atajadas: ${(stats[yo]&&stats[yo].atajadas)||0}</p>`;
   } else {
-    // Modo TIRAR
+    // Modo TIRAR LIBRE — elegís a quién
     const participantes = (db.participantes||[]).filter(p=>p.nombre!==yo);
     if(!participantes.length) { c.innerHTML='<div style="text-align:center;padding:20px;color:#8899cc;font-size:13px">No hay otros participantes para jugar</div>'; renderPenalRanking(); return; }
     const z = penalSel.zona, rv = penalSel.rival;
@@ -2382,9 +2438,19 @@ function elegirRival(r){ penalSel.rival=r; renderJuego(); }
 
 async function tirarPenal(){
   const yo=getMiNombre(); if(!yo||!penalSel.zona||!penalSel.rival) return;
+  await refrescarPenalesFresh(); // estado fresco para chequear bloqueos
+  const lista = db.penales || [];
+  // No tirar si ya hay uno mío sin atajar contra ese rival
+  if(lista.some(p=>p.de===yo && p.a===penalSel.rival && !p.resuelto)) {
+    toast('Ya le tiraste un penal a '+penalSel.rival+', esperá su respuesta'); return;
+  }
+  // No tirar si ese rival YA me tiró uno (tengo que atajarlo primero)
+  if(lista.some(p=>p.de===penalSel.rival && p.a===yo && !p.resuelto)) {
+    toast(penalSel.rival+' te tiró un penal primero — atajá ese'); return;
+  }
   const penal = { id:'p'+Date.now()+Math.random().toString(36).slice(2,6), de:yo, a:penalSel.rival, zonaTiro:penalSel.zona, creado:Date.now(), resuelto:null, _v:8 };
-  const lista = (db.penales||[]).concat(penal);
-  await guardarCampos({ penales: lista });
+  const nueva = lista.concat(penal);
+  await guardarCampos({ penales: nueva });
   toast('⚽ ¡Penal enviado a '+penalSel.rival+'!');
   penalSel = { zona:null, rival:null };
   await refrescarPenalesFresh();
@@ -2398,7 +2464,13 @@ async function atajarPenal(idPenal){
   if(idx<0) return;
   const p = {...lista[idx]};
   p.zonaAtajada = penalSel.zona;
-  p.resultado = (p.zonaAtajada===p.zonaTiro) ? 'atajado' : 'gol';
+  // Normalizar zonas a string limpio antes de comparar (defensa contra valores raros)
+  const zT = String(p.zonaTiro||'').trim().toLowerCase();
+  const zA = String(p.zonaAtajada||'').trim().toLowerCase();
+  p.resultado = (zT && zA && zT === zA) ? 'atajado' : 'gol';
+  if(zT !== p.zonaTiro || zA !== p.zonaAtajada) {
+    console.warn('Penal con zonas raras:', {tiro:p.zonaTiro, atajada:p.zonaAtajada, normT:zT, normA:zA});
+  }
   p.resuelto = Date.now();
   lista[idx] = p;
   // animación corta antes de mostrar resultado grande
@@ -2436,34 +2508,56 @@ function renderPenalRanking(){
   if(!r) return;
   const series = calcularSeries();
   if(!series.length){ r.innerHTML='<div style="text-align:center;padding:10px;color:#8899cc;font-size:12px">Sin penales todavía</div>'; return; }
-  const enJuego = series.filter(s=>s.actual.jugados>0 && !s.pendiente).sort((x,y)=>y.actual.jugados-x.actual.jugados);
+  const enJuego = series.filter(s=>(s.actual.tirosA.length+s.actual.tirosB.length)>0 && !s.pendiente);
   const pendientes = series.filter(s=>s.pendiente);
   const cerradas = [];
   series.forEach(s => s.cerradas.forEach(c => cerradas.push({...c, par:s})));
+
+  // Renderiza una "tarjeta" con dos filas (un jugador por fila) y 5 bolitas cada uno
+  const tarjeta = (jA, jB, tirosA, tirosB, etiqueta, tono) => {
+    const fila = (nombre, tiros) => {
+      const goles = tiros.filter(x=>x).length;
+      const bolitas = Array.from({length:5}).map((_,i) => {
+        if(i < tiros.length) return tiros[i] ? '<span class="ball ball-gol" title="gol"></span>' : '<span class="ball ball-fail" title="atajado"></span>';
+        return '<span class="ball ball-empty" title="por tirar"></span>';
+      }).join('');
+      return `<div class="t-row">
+        <span class="t-name">${nombre}</span>
+        <span class="t-balls">${bolitas}</span>
+        <span class="t-score">${goles}</span>
+      </div>`;
+    };
+    const cls = tono ? 'tarjeta-tanda tono-'+tono : 'tarjeta-tanda';
+    return `<div class="${cls}">
+      ${etiqueta ? `<div class="t-tag">${etiqueta}</div>` : ''}
+      ${fila(jA, tirosA)}
+      ${fila(jB, tirosB)}
+    </div>`;
+  };
+
   let html = '';
   if(pendientes.length){
-    html += '<div style="font-size:11px;color:var(--do);margin-bottom:5px">⏳ Pendientes de revisar</div>';
+    html += '<div class="t-section">⏳ Pendientes de revisar</div>';
     html += pendientes.map(s => {
       const t = s.pendiente;
-      return `<div class="serie-row" style="border-color:var(--do)">
-        <span class="serie-vs"><b>${s.a}</b> ${t.golesA} - ${t.golesB} <b>${s.b}</b></span>
-        <span class="serie-meta">${t.vistos.length}/2 vieron</span>
-      </div>`;
+      const eti = t.vistos.length + '/2 vieron · Tanda ' + t.numTanda;
+      return tarjeta(s.a, s.b, t.tirosA, t.tirosB, eti, 'pendiente');
     }).join('');
   }
   if(enJuego.length){
-    html += '<div style="font-size:11px;color:#aab8e0;margin:'+(pendientes.length?'10px':'')+' 0 5px">⚽ En juego</div>';
-    html += enJuego.map(s => `<div class="serie-row">
-      <span class="serie-vs"><b>${s.a}</b> ${s.actual.golesA} - ${s.actual.golesB} <b>${s.b}</b></span>
-      <span class="serie-meta">${s.actual.jugados}/5</span>
-    </div>`).join('');
+    html += '<div class="t-section">⚽ En juego</div>';
+    html += enJuego.map(s => {
+      const tirosTot = s.actual.tirosA.length + s.actual.tirosB.length;
+      const eti = 'Tanda ' + s.numTanda + ' · ' + tirosTot + '/10 tiros';
+      return tarjeta(s.a, s.b, s.actual.tirosA, s.actual.tirosB, eti);
+    }).join('');
   }
   if(cerradas.length){
-    html += '<div style="font-size:11px;color:#aab8e0;margin:10px 0 5px">🏆 Tandas ganadas</div>';
-    html += cerradas.map(c => `<div class="serie-row serie-cerrada">
-      <span class="serie-vs"><b>${c.par.a}</b> ${c.golesA} - ${c.golesB} <b>${c.par.b}</b></span>
-      <span class="serie-meta">🏆 ${c.ganador} · T${c.numTanda}</span>
-    </div>`).join('');
+    html += '<div class="t-section">🏆 Tandas ganadas</div>';
+    html += cerradas.map(c => {
+      const eti = '🏆 ' + c.ganador + ' · Tanda ' + c.numTanda;
+      return tarjeta(c.par.a, c.par.b, c.tirosA, c.tirosB, eti, 'cerrada');
+    }).join('');
   }
   r.innerHTML = html || '<div style="text-align:center;padding:10px;color:#8899cc;font-size:12px">Sin tandas todavía</div>';
 }
