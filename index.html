@@ -374,7 +374,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v10.9</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v11.0</p>
 </header>
 
 <div class="topbar">
@@ -585,6 +585,7 @@ function checkPin() {
 }
 
 function entrar() {
+  sessionStorage.removeItem('q_salirForzado'); // limpiar flag obsoleto de versiones anteriores
   sessionStorage.setItem('q_role', currentRole);
   if (currentUserId) sessionStorage.setItem('q_uid', String(currentUserId));
   document.getElementById('auth-screen').style.display = 'none';
@@ -2095,9 +2096,6 @@ let chatTimer = null;
 // Cada penal: {id, de, a, zonaTiro, zonaAtajada, resultado:'gol'|'atajado', creado, resuelto}
 let penalSel = { zona:null, rival:null };
 let ultimoResultado = null; // {de, zonaTiro, zonaAtajada, resultado} — para pantalla de resultado
-let salirForzado = new Set(JSON.parse(sessionStorage.getItem('q_salirForzado')||'[]')); // persiste al refrescar
-function addSalirForzado(r) { salirForzado.add(r); sessionStorage.setItem('q_salirForzado', JSON.stringify([...salirForzado])); }
-function delSalirForzado(r) { salirForzado.delete(r); sessionStorage.setItem('q_salirForzado', JSON.stringify([...salirForzado])); }
 
 function getMiNombre() {
   const me = (db.participantes||[]).find(p=>p.id===currentUserId);
@@ -2117,47 +2115,40 @@ function getMiNombre() {
 // =============================================
 
 // Devuelve el estado del par (yo, otro): { puedeIniciar, debeAtajar, debeTirar, bloqueado, motivo }
+// Lógica basada ÚNICAMENTE en calcularSeries() — sin aritmética de "% 10" ni banderas
+// auxiliares. La tanda actual (par.actual) se vacía exactamente cuando se completan
+// los 5+5 tiros, así que "actual vacío" = ciclo recién cerrado = libre para iniciar.
 function estadoContraRival(yo, otro) {
-  const lista = (db.penales||[]).filter(p =>
-    (p.de===yo && p.a===otro) || (p.de===otro && p.a===yo)
-  ).sort((a,b)=>(a.creado||0)-(b.creado||0));
-
-  // Tanda pendiente de revisión: bloquea solo si YO no la he confirmado aún
   const series = calcularSeries();
   const par = series.find(s => (s.a===yo && s.b===otro) || (s.a===otro && s.b===yo));
+
+  // Tanda pendiente de revisión: bloquea solo si YO no la he confirmado aún
   if(par && par.pendiente && !par.pendiente.vistos.includes(yo)) {
     return { bloqueado:true, motivo:'tanda en revisión' };
   }
 
+  const lista = (db.penales||[]).filter(p =>
+    (p.de===yo && p.a===otro) || (p.de===otro && p.a===yo)
+  ).sort((a,b)=>(a.creado||0)-(b.creado||0));
+
   // Sin penales entre los dos → cualquiera puede iniciar
   if(!lista.length) return { puedeIniciar:true };
 
-  // El último penal manda
+  // El penal sin resolver manda primero (siempre hay como máximo uno en el aire)
   const ultimo = lista[lista.length-1];
   if(!ultimo.resuelto) {
-    // Penal en el aire: solo el arquero puede atajarlo
     if(ultimo.a === yo) return { debeAtajar:ultimo };
     return { bloqueado:true, motivo:'esperando que '+otro+' ataje' };
   }
-  // Contar penales resueltos
-  const deMi = lista.filter(p => p.de===yo && p.resuelto).length;
-  const deOtro = lista.filter(p => p.de===otro && p.resuelto).length;
-  const total = deMi + deOtro;
 
-  // ¿Tanda pendiente y YO ya la confirmé? → fuera del ciclo
-  if(par && par.pendiente && par.pendiente.vistos.includes(yo)) {
-    return { puedeIniciar:true };
-  }
-  // ¿Tanda cerrada por ambos y total exacto? → fuera del ciclo
-  if(par && !par.pendiente && total > 0 && total % 10 === 0 && deMi === deOtro) {
-    return { puedeIniciar:true };
-  }
-  // ¿salirForzado? → fuera del ciclo
-  if(salirForzado.has(otro)) {
+  // Último penal resuelto: si la tanda actual está vacía, el ciclo anterior
+  // ya cerró completo (5+5) → libre para iniciar uno nuevo.
+  const actual = par ? par.actual : { tirosA:[], tirosB:[] };
+  if(actual.tirosA.length === 0 && actual.tirosB.length === 0) {
     return { puedeIniciar:true };
   }
 
-  // El último penal manda
+  // Tanda en curso: el receptor del último tiro debe devolver
   if(ultimo.a === yo) return { debeTirar:true };
   return { bloqueado:true, motivo:'le toca tirar a '+otro };
 }
@@ -2186,11 +2177,10 @@ function penalesEstado() {
   });
 
   // Siguiente acción de cola: la más vieja entre atajar/devolver de TODAS las series
-  // (excepto rivales con tanda pendiente de revisar o con salir forzado)
+  // (excepto rivales con tanda pendiente de revisar)
   const acciones = [];
   otros.forEach(r => {
     if(rivalesConPendiente.has(r)) return; // este rival está bloqueado por tanda pendiente
-    if(salirForzado.has(r)) return; // ya di Salir contra este rival, modo libre
     const e = estadoPorRival[r];
     if(e.debeAtajar) acciones.push({ tipo:'atajar', cuando:e.debeAtajar.creado||0, penal:e.debeAtajar, rival:r });
     else if(e.debeTirar) {
@@ -2245,11 +2235,14 @@ function calcularSeries() {
   return Object.values(porPar).map(par => {
     const parKey = par.a + '|' + par.b;
     const cerradas = [];
-    let pendiente = null;
+    const pendientes = []; // normalmente 0 o 1, pero nunca se pierden datos si se acumula más de una
     // tirosA / tirosB = lista de booleans (true=gol, false=atajado) por cada tiro DE ese jugador
     let actual = { a:par.a, b:par.b, tirosA:[], tirosB:[], penales:[] };
     let numTanda = 1;
 
+    // Cierra la tanda actual (cerrada o pendiente) y SIEMPRE sigue procesando los
+    // tiros siguientes en una tanda nueva — nunca se descartan tiros posteriores
+    // a una tanda sin confirmar (eso era el bug: tiros "fantasma" que rompían el ciclo).
     const cerrarSiCompleta = () => {
       if(actual.tirosA.length >= 5 && actual.tirosB.length >= 5) {
         const golesA = actual.tirosA.filter(x=>x).length;
@@ -2258,34 +2251,27 @@ function calcularSeries() {
         const conf = confKey(parKey, numTanda);
         const vistos = conf ? conf.vistos : [];
         const ambosVieron = vistos.includes(par.a) && vistos.includes(par.b);
-        if(ambosVieron) {
-          cerradas.push({ ...actual, golesA, golesB, ganador, numTanda, vistos });
-          numTanda++;
-          actual = { a:par.a, b:par.b, tirosA:[], tirosB:[], penales:[] };
-        } else {
-          pendiente = { ...actual, golesA, golesB, ganador, numTanda, vistos, parKey };
-          return true; // detener procesamiento hasta confirmación
-        }
+        const tandaObj = { ...actual, golesA, golesB, ganador, numTanda, vistos, parKey };
+        if(ambosVieron) cerradas.push(tandaObj);
+        else pendientes.push(tandaObj);
+        numTanda++;
+        actual = { a:par.a, b:par.b, tirosA:[], tirosB:[], penales:[] };
       }
-      return false;
     };
 
     for(const p of par.lista) {
       const fueGol = p.resultado === 'gol';
-      if(p.de === par.a) {
-        if(actual.tirosA.length >= 5) continue; // no debería pasar, pero seguro
-        actual.tirosA.push(fueGol);
-      } else {
-        if(actual.tirosB.length >= 5) continue;
-        actual.tirosB.push(fueGol);
-      }
+      if(p.de === par.a) actual.tirosA.push(fueGol);
+      else actual.tirosB.push(fueGol);
       actual.penales.push(p);
-      if(cerrarSiCompleta()) break;
+      cerrarSiCompleta();
     }
     // Goles "en juego" de la tanda actual
     actual.golesA = actual.tirosA.filter(x=>x).length;
     actual.golesB = actual.tirosB.filter(x=>x).length;
-    return { a:par.a, b:par.b, parKey, numTanda, cerradas, pendiente, actual };
+    // pendiente = la más vieja sin confirmar por ambos (la que hay que resolver primero)
+    const pendiente = pendientes.length ? pendientes[0] : null;
+    return { a:par.a, b:par.b, parKey, numTanda, cerradas, pendiente, pendientes, actual };
   });
 }
 
@@ -2549,8 +2535,6 @@ function elegirRival(r){ penalSel.rival=r; renderJuego(); }
 async function tirarPenal(){
   const yo=getMiNombre(); if(!yo||!penalSel.zona||!penalSel.rival) return;
   await refrescarPenalesFresh();
-  // Si ya di Salir contra este rival y ahora le tiro, salir del modo forzado
-  if(salirForzado.has(penalSel.rival)) delSalirForzado(penalSel.rival);
   // Validar contra las dos reglas: puedeIniciar (sin serie) o debeTirar (me toca tras atajar/recibir gol)
   const e = estadoContraRival(yo, penalSel.rival);
   if(e.bloqueado) { toast('No podés tirar ahora — '+e.motivo); return; }
@@ -2599,7 +2583,8 @@ async function atajarPenal(idPenal){
 
 function cerrarResultado(){ ultimoResultado = null; renderJuego(); renderPenalBanner(); }
 
-// Marca a `yo` como "visto" y saca al jugador del ciclo.
+// Marca a `yo` como "visto". Una vez confirmado, estadoContraRival() me deja
+// libre automáticamente (la tanda actual queda vacía hasta que alguien tire de nuevo).
 async function confirmarTanda(parKey, numTanda) {
   const yo = getMiNombre(); if(!yo) return;
   const lista = (db.tandasConfirm || []).slice();
@@ -2608,9 +2593,6 @@ async function confirmarTanda(parKey, numTanda) {
   if(!entry.vistos.includes(yo)) entry.vistos.push(yo);
   await guardarCampos({ tandasConfirm: lista });
   await refrescarPenalesFresh();
-  // Salir al modo libre — forzar que no haya devolver/atajar contra este rival
-  const rival = parKey.split('|').find(n => n!==yo);
-  addSalirForzado(rival);
   penalSel = { zona:null, rival:null };
   ultimoResultado = null;
   toast('✅ Resultado visto');
