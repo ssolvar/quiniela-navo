@@ -374,7 +374,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v9.2</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v9.3</p>
 </header>
 
 <div class="topbar">
@@ -2149,6 +2149,15 @@ function penalesEstado() {
   const esperaConfirmYo = tandasMias.map(s => s.a===yo ? s.b : s.a);
   const pendientesParaConfirmar = tandasMias.filter(s => !s.pendiente.vistos.includes(yo));
 
+  // Si hay tandas pendientes de revisar, BLOQUEAR TODO.
+  // El jugador no puede tirar ni atajar hasta que revise el resultado.
+  if(pendientesParaConfirmar.length){
+    const estadoPorRival = {};
+    const otros = (db.participantes||[]).filter(p => p.nombre!==yo).map(p => p.nombre);
+    otros.forEach(r => { estadoPorRival[r] = { bloqueado:true, motivo:'revisá la tanda terminada' }; });
+    return { siguienteAccion:null, esperaConfirmYo, pendientesParaConfirmar, estadoPorRival };
+  }
+
   // Calcular estado contra CADA rival
   const otros = (db.participantes||[]).filter(p => p.nombre!==yo).map(p => p.nombre);
   const estadoPorRival = {};
@@ -2278,11 +2287,17 @@ async function renderPenalBanner() {
   // 1) Resumen de tanda pendiente de confirmar — prioridad máxima
   if(pendientesParaConfirmar && pendientesParaConfirmar.length){
     const s = pendientesParaConfirmar[0];
+    const t = s.pendiente;
     const rival = s.a===yo ? s.b : s.a;
+    const golesYo = s.a===yo ? t.golesA : t.golesB;
+    const golesRival = s.a===yo ? t.golesB : t.golesA;
+    const empate = t.ganador === null;
+    const ganeYo = t.ganador === yo;
+    const resumen = empate ? '🤝 Empate' : (ganeYo ? '🏆 Ganaste' : '😞 Perdiste');
     el.style.display='block';
-    el.innerHTML = `<button class="pban" onclick="showTab('juego')">
+    el.innerHTML = `<button class="pban" onclick="showTab('juego')" style="animation:pbanPulse .8s ease-in-out infinite;border-color:${empate?'#c9a227':ganeYo?'#1d9e75':'#e24b4a'}">
       <span class="pban-ico">🏁</span>
-      <span class="pban-tx"><b>Tanda terminada vs ${rival}</b><small>mirá el resumen</small></span>
+      <span class="pban-tx"><b>${resumen} ${golesYo}-${golesRival} vs ${rival}</b><small>⚠️ Tocá para ver el resultado — no podés seguir sin revisar</small></span>
       <span class="pban-arrow">›</span></button>`;
     return;
   }
@@ -2365,14 +2380,12 @@ async function renderJuego() {
     const golesRival = s.a === yo ? t.golesB : t.golesA;
     const empate = t.ganador === null;
     const ganeYo = t.ganador === yo;
-    const cabecera = empate
-      ? `<div style="font-size:26px;font-weight:700;color:#c9a227;letter-spacing:1px">🤝 EMPATE</div>
-         <div style="font-size:11px;color:#aab8e0;margin-top:3px">Tanda ${t.numTanda} · arranca una nueva en 0-0</div>`
+    // Leyenda clara de quién ganó
+    const leyenda = empate
+      ? `<div style="font-size:15px;font-weight:700;color:#c9a227;letter-spacing:1px;background:rgba(201,162,39,.12);border:1.5px solid #c9a227;border-radius:10px;padding:10px 14px;text-align:center">🤝 ¡EMPATE! ${golesYo}-${golesRival} · Nadie ganó la tanda ${t.numTanda}</div>`
       : ganeYo
-        ? `<div style="font-size:28px;font-weight:700;color:#1d9e75;letter-spacing:1px">🏆 ¡GANASTE LA TANDA!</div>
-           <div style="font-size:11px;color:#aab8e0;margin-top:3px">Tanda ${t.numTanda} · vs ${rival}</div>`
-        : `<div style="font-size:28px;font-weight:700;color:#e24b4a;letter-spacing:1px">😞 PERDISTE LA TANDA</div>
-           <div style="font-size:11px;color:#aab8e0;margin-top:3px">Tanda ${t.numTanda} · vs ${rival}</div>`;
+        ? `<div style="font-size:15px;font-weight:700;color:#1d9e75;letter-spacing:1px;background:rgba(29,158,117,.12);border:1.5px solid #1d9e75;border-radius:10px;padding:10px 14px;text-align:center">🏆 ¡GANASTE! ${golesYo}-${golesRival} · Le ganaste la tanda ${t.numTanda} a ${rival}</div>`
+        : `<div style="font-size:15px;font-weight:700;color:#e24b4a;letter-spacing:1px;background:rgba(226,75,74,.12);border:1.5px solid #e24b4a;border-radius:10px;padding:10px 14px;text-align:center">😞 PERDISTE ${golesYo}-${golesRival} · ${rival} te ganó la tanda ${t.numTanda}</div>`;
     // detalle penal a penal
     const filas = t.penales.map((p,i) => {
       const tirador = p.de;
@@ -2395,16 +2408,14 @@ async function renderJuego() {
       <div class="t-row"><span class="t-name">${s.a}</span><span class="t-balls">${bolitas(t.tirosA)}</span><span class="t-score">${t.golesA}</span></div>
       <div class="t-row"><span class="t-name">${s.b}</span><span class="t-balls">${bolitas(t.tirosB)}</span><span class="t-score">${t.golesB}</span></div>
     </div>`;
+    const btnTexto = empate ? '✓ Aceptar y seguir jugando ⚽' : '✓ Aceptar e ir por la revancha ⚽';
     c.innerHTML = `
-      <div style="text-align:center;margin-bottom:10px">${cabecera}</div>
-      <div style="text-align:center;font-size:38px;font-weight:700;color:#fff;margin:5px 0 6px;letter-spacing:2px">
-        ${golesYo} - ${golesRival}
-      </div>
+      ${leyenda}
       ${visualTanda}
       <div style="font-size:11px;color:#8899cc;margin-bottom:6px">Detalle de la tanda:</div>
       ${filas}
-      <button class="btn-go" style="margin-top:10px" onclick="confirmarTanda('${s.parKey}', ${t.numTanda})">
-        ${empate ? 'Reiniciar y a jugar ⚽' : 'Vamos por la revancha ⚽'}
+      <button class="btn-go" style="margin-top:12px" onclick="confirmarTanda('${s.parKey}', ${t.numTanda})">
+        ${btnTexto}
       </button>
       <p style="font-size:11px;color:${otroVisto?'#1d9e75':'#8899cc'};text-align:center;margin-top:8px">
         ${otroVisto ? '✅ '+rival+' ya vio el resumen' : '⏳ esperando que '+rival+' también vea el resumen'}
