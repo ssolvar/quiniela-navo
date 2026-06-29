@@ -374,7 +374,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v9.1</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v9.2</p>
 </header>
 
 <div class="topbar">
@@ -2656,15 +2656,7 @@ function renderPenalRanking(){
         return tarjeta(s.a, s.b, s.actual.tirosA, s.actual.tirosB, eti);
       }).join('');
     }
-    // Mini-resumen de últimas 2 cerradas
-    if(cerradas.length){
-      html += '<div class="t-section" style="margin-top:8px">🏆 Últimas ganadas</div>';
-      html += cerradas.slice(-2).map(c => {
-        const eti = (c.ganador ? '🏆 ' + c.ganador : '🤝 Empate') + ' · Tanda ' + c.numTanda;
-        return tarjeta(c.par.a, c.par.b, c.tirosA, c.tirosB, eti, 'cerrada');
-      }).join('');
-    }
-    if(!pendientes.length && !enJuego.length && !cerradas.length){
+    if(!pendientes.length && !enJuego.length){
       html += '<div style="text-align:center;padding:10px;color:#8899cc;font-size:12px">Sin tandas todavía</div>';
     }
   }
