@@ -449,10 +449,118 @@ export default {
     }
 
     // ==========================================
+    // PENALES-ESTADO — para OpenClaw/agentes externos
+    // ==========================================
+    if (path === '/api/penales-estado') {
+      const jugador = url.searchParams.get('jugador');
+      if(!jugador) return new Response(JSON.stringify({error:'falta ?jugador='}), {headers:CORS, status:400});
+
+      // POST: confirmar tanda (equivale a presionar el botón Salir)
+      if(request.method === 'POST'){
+        try {
+          const body = await request.json();
+          const { parKey, numTanda } = body;
+          if(!parKey || !numTanda) return new Response(JSON.stringify({error:'falta parKey o numTanda'}), {headers:CORS, status:400});
+          let lista = await kvGet(KV, 'tandasConfirm') || [];
+          let entry = lista.find(c => c.par===parKey && c.numTanda===numTanda);
+          if(!entry) { entry = { par:parKey, numTanda, vistos:[] }; lista.push(entry); }
+          if(!entry.vistos.includes(jugador)) entry.vistos.push(jugador);
+          await kvSet(KV, 'tandasConfirm', lista);
+          return new Response(JSON.stringify({ok:true, accion:'tanda confirmada', vistos:entry.vistos}), {headers:CORS});
+        } catch(e) {
+          return new Response(JSON.stringify({error:e.message}), {headers:CORS, status:500});
+        }
+      }
+
+      // GET: consultar estado — misma regla que el frontend (v11.0):
+      // se agrupan los tiros resueltos en tandas de 5+5; cuando una tanda completa,
+      // se reinicia el conteo (sin perder tiros posteriores) y SOLO entonces el
+      // ciclo se considera cerrado. Nunca se usa aritmética de "% 10" sobre el total.
+      try {
+        const [penales, tandasConfirm] = await Promise.all([
+          kvGet(KV, 'penales') || [],
+          kvGet(KV, 'tandasConfirm') || [],
+        ]);
+
+        // Agrupar penales por rival (en los que participa `jugador`)
+        const rivales = new Set();
+        penales.forEach(p => {
+          if(p.de === jugador) rivales.add(p.a);
+          else if(p.a === jugador) rivales.add(p.de);
+        });
+
+        const porAtajar = [], esperando = [], tandasPendientes = [], porDevolver = [];
+
+        rivales.forEach(rival => {
+          const [x, y] = [jugador, rival].sort();
+          const parKey = x + '|' + y;
+          const lista = penales.filter(p =>
+            (p.de===jugador && p.a===rival) || (p.de===rival && p.a===jugador)
+          ).sort((a,b)=>(a.creado||0)-(b.creado||0));
+
+          // Construir tandas de 5+5 a partir de los resueltos, sin perder tiros
+          const resueltosPar = lista.filter(p => p.resuelto).sort((a,b)=>(a.resuelto||0)-(b.resuelto||0));
+          let actual = { tirosX:0, tirosY:0 }; // x,y = par ordenado alfabéticamente
+          let numTanda = 1;
+          let pendienteTanda = null;
+          resueltosPar.forEach(p => {
+            if(p.de === x) actual.tirosX++; else actual.tirosY++;
+            if(actual.tirosX >= 5 && actual.tirosY >= 5) {
+              const conf = tandasConfirm.find(c => c.par===parKey && c.numTanda===numTanda);
+              const vistos = conf ? conf.vistos : [];
+              const ambosVieron = vistos.includes(x) && vistos.includes(y);
+              if(!ambosVieron && !pendienteTanda) pendienteTanda = { numTanda, vistos };
+              numTanda++;
+              actual = { tirosX:0, tirosY:0 };
+            }
+          });
+
+          // ¿Hay tanda pendiente que el jugador no confirmó?
+          if(pendienteTanda && !pendienteTanda.vistos.includes(jugador)) {
+            tandasPendientes.push({
+              rival, parKey, numTanda: pendienteTanda.numTanda,
+              accion: 'salir', motivo: 'tanda completada, hay que darle al botón Salir (POST a este endpoint)'
+            });
+            return; // bloqueado contra este rival hasta confirmar
+          }
+
+          // El penal sin resolver manda (máximo uno en el aire)
+          const ultimo = lista[lista.length-1];
+          if(ultimo && !ultimo.resuelto) {
+            if(ultimo.a === jugador) porAtajar.push({ id:ultimo.id, de:ultimo.de, rival });
+            else esperando.push({ id:ultimo.id, a:ultimo.a, rival });
+            return;
+          }
+
+          // Último resuelto: si "actual" está vacío, el ciclo cerró → libre (no hacer nada)
+          if(actual.tirosX === 0 && actual.tirosY === 0) return;
+
+          // Tanda en curso: el receptor del último resuelto debe devolver
+          if(ultimo && ultimo.a === jugador) {
+            porDevolver.push({ rival, accion: 'devolver', motivo: 'devolver penal' });
+          }
+        });
+
+        return new Response(JSON.stringify({
+          jugador,
+          porAtajar, porDevolver, esperando, tandasPendientes,
+          resumen: tandasPendientes.length ? 'SALIR' :
+                   porAtajar.length ? 'ATAJAR' :
+                   porDevolver.length ? 'DEVOLVER' :
+                   esperando.length ? 'ESPERAR' : 'LIBRE'
+        }), {headers:CORS});
+      } catch(e) {
+        return new Response(JSON.stringify({error:e.message}), {headers:CORS, status:500});
+      }
+    }
+
+    // ==========================================
     // HTML — servir app
     // ==========================================
     try {
-      const res = await fetch(HTML_URL);
+      // Cache buster para evitar caché de GitHub raw
+      const url = HTML_URL + '?t=' + Date.now();
+      const res = await fetch(url, { cf: { cacheTtl: 0 } });
       const html = await res.text();
       return new Response(html, { headers: {'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-cache'} });
     } catch(e) {
