@@ -84,14 +84,11 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 .rival-btn.dis{opacity:.4;cursor:not-allowed;text-decoration:line-through}
 .rival-btn small{display:block;font-size:10px;color:#6677aa;margin-top:2px}
 .pen-row{display:flex;align-items:center;justify-content:space-between;background:#0d1440;border-radius:7px;padding:8px 12px;margin-bottom:5px;font-family:'Inter',sans-serif;font-size:13px;color:#fff}
-.pen-row .medal{margin-right:5px}
-.pen-row small{color:#aab8e0;font-size:11px}
-.stats-row{display:grid;grid-template-columns:1.4fr .9fr .9fr .9fr;align-items:center;background:#0d1440;border-radius:7px;padding:8px 10px;margin-bottom:5px;font-family:'Inter',sans-serif;font-size:13px;color:#fff;gap:4px}
-.stats-row.stats-head{background:transparent;padding:4px 10px;font-size:11px;color:#8899cc;font-weight:500;margin-bottom:3px}
-.stats-name{display:flex;align-items:center}
-.stats-name .medal{margin-right:5px}
-.stats-col{text-align:center;font-variant-numeric:tabular-nums}
-.stats-row:not(.stats-head) .stats-col{font-weight:600}
+.serie-row{display:flex;align-items:center;justify-content:space-between;background:#0d1440;border:1px solid #1a2a70;border-radius:7px;padding:9px 12px;margin-bottom:5px;font-family:'Inter',sans-serif;font-size:13px;color:#fff;gap:8px}
+.serie-row.serie-cerrada{background:#0a0e27;border-color:#172048;opacity:.85}
+.serie-vs{flex:1}
+.serie-vs b{color:#fff;font-weight:600}
+.serie-meta{font-size:11px;color:var(--do);font-weight:600;white-space:nowrap}
 .gk-body,.ball-body{transition:transform 1s ease-out}
 .gk-dive-l{transform:translate(-60px,8px) rotate(-55deg)}
 .gk-dive-r{transform:translate(60px,8px) rotate(55deg)}
@@ -363,7 +360,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v8.5</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v8.6</p>
 </header>
 
 <div class="topbar">
@@ -710,10 +707,25 @@ async function guardarCampos(campos) {
 }
 
 // Al entrar: forzar la actualización de TODAS las APIs (partidos, db, standings, goleadores)
+// Limpieza única al subir a v8.6: los penales viejos no tienen estructura de series y
+// quedaron con ruido de pruebas (bugs del centro, etc.). Si no hay flag _v8, se borran.
+async function migrarPenalesV8() {
+  try {
+    const lista = db.penales || [];
+    if(!lista.length) return; // nada que limpiar
+    const yaMigrado = lista.every(p => p._v === 8);
+    if(yaMigrado) return;
+    // Vaciar penales (solo del campo penales — no toca nada más)
+    await guardarCampos({ penales: [] });
+    db.penales = [];
+  } catch(e) { console.error('migrarPenalesV8:', e); }
+}
+
 async function precargarTodo() {
   setSyncStatus('loading');
   try {
     await cargarDatos(true);    // datos + chat PRIMERO (rápido)
+    await migrarPenalesV8();    // limpieza única de penales viejos al subir a v8.6
     await cargarMundial();       // goleadores y standings (desde db.partidos)
     setSyncStatus('ok');
   } catch(e) { setSyncStatus('error'); console.error('Precarga inicial:', e); }
@@ -2099,6 +2111,41 @@ function calcularStats() {
   return s;
 }
 
+// Agrupa los penales RESUELTOS por par de jugadores en series de 5.
+// Por cada par devuelve { jugadores:[a,b], cerradas:[{a,golesA,b,golesB,ganador}], actual:{a,golesA,b,golesB,jugados} }
+// Reglas: 5 penales jugados entre los dos = serie cerrada (gana el que más metió).
+// Si quedan empatados a los 5, se DESCARTA esa serie y arranca otra desde 0.
+function calcularSeries() {
+  const porPar = {}; // key = "A|B" (alfabético) → array de penales en orden cronológico
+  (db.penales||[]).filter(p=>p.resuelto).sort((x,y)=>x.resuelto-y.resuelto).forEach(p => {
+    const [a,b] = [p.de, p.a].sort();
+    const key = a + '|' + b;
+    if(!porPar[key]) porPar[key] = { a, b, lista:[] };
+    porPar[key].lista.push(p);
+  });
+  return Object.values(porPar).map(par => {
+    const cerradas = [];
+    let actual = { a:par.a, b:par.b, golesA:0, golesB:0, jugados:0 };
+    for(const p of par.lista) {
+      actual.jugados++;
+      if(p.resultado === 'gol') {
+        if(p.de === par.a) actual.golesA++; else actual.golesB++;
+      }
+      if(actual.jugados >= 5) {
+        if(actual.golesA === actual.golesB) {
+          // empate: descartar esta serie y empezar otra (no cuenta)
+          actual = { a:par.a, b:par.b, golesA:0, golesB:0, jugados:0 };
+        } else {
+          const ganador = actual.golesA > actual.golesB ? par.a : par.b;
+          cerradas.push({ ...actual, ganador });
+          actual = { a:par.a, b:par.b, golesA:0, golesB:0, jugados:0 };
+        }
+      }
+    }
+    return { a:par.a, b:par.b, cerradas, actual };
+  });
+}
+
 async function refrescarPenalesFresh() {
   // Trae los penales del KV en vivo (sin depender del db local) y actualiza db.penales.
   // Lo llamamos antes de pintar el banner para garantizar que la "notificación" sea real-time.
@@ -2243,7 +2290,7 @@ function elegirRival(r){ penalSel.rival=r; renderJuego(); }
 
 async function tirarPenal(){
   const yo=getMiNombre(); if(!yo||!penalSel.zona||!penalSel.rival) return;
-  const penal = { id:'p'+Date.now()+Math.random().toString(36).slice(2,6), de:yo, a:penalSel.rival, zonaTiro:penalSel.zona, creado:Date.now(), resuelto:null };
+  const penal = { id:'p'+Date.now()+Math.random().toString(36).slice(2,6), de:yo, a:penalSel.rival, zonaTiro:penalSel.zona, creado:Date.now(), resuelto:null, _v:8 };
   const lista = (db.penales||[]).concat(penal);
   await guardarCampos({ penales: lista });
   toast('⚽ ¡Penal enviado a '+penalSel.rival+'!');
@@ -2282,24 +2329,29 @@ function cerrarResultado(){ ultimoResultado = null; renderJuego(); renderPenalBa
 function renderPenalRanking(){
   const r = document.getElementById('penales-ranking');
   if(!r) return;
-  const stats = calcularStats();
-  const lista = Object.entries(stats)
-    .map(([n,s])=>({n, tiros:s.tiros, atajadas:s.atajadas, goles:s.goles}))
-    .sort((a,b)=> b.goles-a.goles || b.atajadas-a.atajadas);
-  if(!lista.length){ r.innerHTML='<div style="text-align:center;padding:10px;color:#8899cc;font-size:12px">Sin penales todavía</div>'; return; }
-  const med=['🥇','🥈','🥉'];
-  // Encabezado + filas (3 columnas: tiros, atajadas, goles)
-  r.innerHTML = `<div class="stats-row stats-head">
-      <span class="stats-name">Jugador</span>
-      <span class="stats-col">⚽ Tiros</span>
-      <span class="stats-col">🧤 Atajó</span>
-      <span class="stats-col">🥅 Goles</span>
-    </div>` + lista.map((x,i)=>`<div class="stats-row">
-      <span class="stats-name"><span class="medal">${med[i]||'·'}</span>${x.n}</span>
-      <span class="stats-col">${x.tiros}</span>
-      <span class="stats-col">${x.atajadas}</span>
-      <span class="stats-col">${x.goles}</span>
+  const series = calcularSeries();
+  if(!series.length){ r.innerHTML='<div style="text-align:center;padding:10px;color:#8899cc;font-size:12px">Sin penales todavía</div>'; return; }
+  // Series en juego (al menos un penal jugado) primero, después cerradas
+  const enJuego = series.filter(s=>s.actual.jugados>0).sort((x,y)=>y.actual.jugados-x.actual.jugados);
+  const cerradas = [];
+  series.forEach(s => s.cerradas.forEach(c => cerradas.push(c)));
+  let html = '';
+  if(enJuego.length){
+    html += '<div style="font-size:11px;color:#aab8e0;margin-bottom:5px">⚽ En juego</div>';
+    html += enJuego.map(s => `<div class="serie-row">
+      <span class="serie-vs"><b>${s.a}</b> ${s.actual.golesA} - ${s.actual.golesB} <b>${s.b}</b></span>
+      <span class="serie-meta">${s.actual.jugados}/5</span>
     </div>`).join('');
+  }
+  if(cerradas.length){
+    html += '<div style="font-size:11px;color:#aab8e0;margin:10px 0 5px">🏆 Series ganadas</div>';
+    // ordenar por más recientes (último penal de la serie) implícito por orden de creación
+    html += cerradas.map(c => `<div class="serie-row serie-cerrada">
+      <span class="serie-vs"><b>${c.a}</b> ${c.golesA} - ${c.golesB} <b>${c.b}</b></span>
+      <span class="serie-meta">🏆 ${c.ganador}</span>
+    </div>`).join('');
+  }
+  r.innerHTML = html || '<div style="text-align:center;padding:10px;color:#8899cc;font-size:12px">Sin series todavía</div>';
 }
 
 function renderChat() {
