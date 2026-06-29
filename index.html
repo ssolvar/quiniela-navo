@@ -374,7 +374,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v10.5</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v10.6</p>
 </header>
 
 <div class="topbar">
@@ -2137,18 +2137,16 @@ function estadoContraRival(yo, otro) {
     if(ultimo.a === yo) return { debeAtajar:ultimo };
     return { bloqueado:true, motivo:'esperando que '+otro+' ataje' };
   }
-  // Antes de decidir: ¿hay tanda completa (10, 20... penales) y yo ya salí?
+  // ¿Tanda pendiente y YO ya la confirmé? → fuera del ciclo
+  if(par && par.pendiente && par.pendiente.vistos.includes(yo)) {
+    return { puedeIniciar:true };
+  }
+  // ¿Tanda cerrada por ambos? → fuera del ciclo
   const deMi = lista.filter(p => p.de===yo && p.resuelto).length;
   const deOtro = lista.filter(p => p.de===otro && p.resuelto).length;
   const total = deMi + deOtro;
-  if(total > 0 && total % 10 === 0 && deMi === deOtro) {
-    const numTanda = total / 10;
-    const yoConfirme = (db.tandasConfirm||[]).some(c =>
-      c.par===(([yo,otro].sort()).join('|')) && c.numTanda===numTanda && c.vistos.includes(yo)
-    );
-    if(!par || !par.pendiente || yoConfirme) {
-      return { puedeIniciar:true }; // tanda cerrada o ya confirmé, cualquiera puede iniciar
-    }
+  if(par && !par.pendiente && total > 0 && total % 10 === 0 && deMi === deOtro) {
+    return { puedeIniciar:true };
   }
 
   // El último penal manda
