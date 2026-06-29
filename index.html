@@ -374,7 +374,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v10.0</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v10.1</p>
 </header>
 
 <div class="topbar">
@@ -2119,10 +2119,10 @@ function estadoContraRival(yo, otro) {
     (p.de===yo && p.a===otro) || (p.de===otro && p.a===yo)
   ).sort((a,b)=>(a.creado||0)-(b.creado||0));
 
-  // Tanda pendiente de revisión: nadie puede tirar
+  // Tanda pendiente de revisión: bloquea solo si YO no la he confirmado aún
   const series = calcularSeries();
   const par = series.find(s => (s.a===yo && s.b===otro) || (s.a===otro && s.b===yo));
-  if(par && par.pendiente) {
+  if(par && par.pendiente && !par.pendiente.vistos.includes(yo)) {
     return { bloqueado:true, motivo:'tanda en revisión' };
   }
 
