@@ -374,7 +374,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v10.3</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v10.4</p>
 </header>
 
 <div class="topbar">
@@ -2449,7 +2449,7 @@ async function renderJuego() {
     const ataj = r.resultado === 'atajado';
     const gkCls = r.zonaAtajada==='izq'?'gk-dive-l':r.zonaAtajada==='der'?'gk-dive-r':'gk-stay';
     const ballCls = r.zonaTiro==='izq'?'ball-go-l':r.zonaTiro==='centro'?'ball-go-c':'ball-go-r';
-    const zNombre = z => z==='izq'?'izquierda':z==='der'?'derecha':'centro';
+    const zNombre = z => ({izq:'izquierda',izquierda:'izquierda',left:'izquierda',centro:'centro',center:'centro',medio:'centro',der:'derecha',derecha:'derecha',right:'derecha'})[String(z||'').toLowerCase().replace(/[^a-z]/gi,'')]||('¿'+z+'?');
     c.innerHTML = `
       <div style="text-align:center;margin-bottom:8px">
         <div style="font-size:32px;font-weight:700;color:${ataj?'#1d9e75':'#e24b4a'};letter-spacing:1px;line-height:1.1">
@@ -2563,13 +2563,13 @@ async function atajarPenal(idPenal){
   if(idx<0) return;
   const p = {...lista[idx]};
   p.zonaAtajada = penalSel.zona;
-  // Normalizar zonas: solo letras, sin espacios ni caracteres raros
+  // Comparar por código numérico — inmune a mayúsculas, espacios o caracteres raros
+  const CODIGO = {izq:1, izquierda:1, left:1, centro:2, center:2, medio:2, der:3, derecha:3, right:3};
   const limpiar = v => String(v||'').replace(/[^a-záéíóúñ]/gi,'').toLowerCase();
-  const zT = limpiar(p.zonaTiro);
-  const zA = limpiar(p.zonaAtajada);
-  p.resultado = (zT && zA && zT === zA) ? 'atajado' : 'gol';
-  // Log para debug en consola
-  console.log('🥅 Atajada:', JSON.stringify({tiro:zT, atajada:zA, resultado:p.resultado}));
+  const zT = CODIGO[limpiar(p.zonaTiro)] || 0;
+  const zA = CODIGO[limpiar(p.zonaAtajada)] || 0;
+  p.resultado = (zT > 0 && zA > 0 && zT === zA) ? 'atajado' : 'gol';
+  console.log('🥅 Atajada:', JSON.stringify({tiroRaw:p.zonaTiro, atajadaRaw:p.zonaAtajada, zT, zA, resultado:p.resultado}));
   p.resuelto = Date.now();
   lista[idx] = p;
   // animación corta antes de mostrar resultado grande
