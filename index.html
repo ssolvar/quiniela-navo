@@ -374,7 +374,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v11.0</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v11.1</p>
 </header>
 
 <div class="topbar">
@@ -1140,10 +1140,12 @@ function renderPartidos() {
 
   function cardHTML(p){
     const isFT=p.status==='FT', isLive=p.status==='LIVE', isHT=p.status==='HT';
-    const cls=isFT?'ft':(isLive||isHT)?'live':'pre';
+    const isET=p.status==='ET', isPENS=p.status==='PENS';
+    const isActivo=isLive||isHT||isET||isPENS;
+    const cls=isFT?'ft':isActivo?'live':'pre';
     const minLabel = p.minuto ? ` ${p.minuto}` : '';
-    const statusLabel=isFT?'FINALIZADO':isHT?'⏸ MEDIO TIEMPO':isLive?`EN VIVO${minLabel}`:formatFecha(p.fecha,p.hora);
-    const marcador=isFT||isLive||isHT?`<span class="marcador ${cls}">${p.g1} - ${p.g2}</span>`:`<span class="marcador pre">vs</span>`;
+    const statusLabel=isFT?'FINALIZADO':isHT?'⏸ MEDIO TIEMPO':isET?`⚡ TIEMPO EXTRA${minLabel}`:isPENS?`🥅 PENALES${minLabel}`:isLive?`EN VIVO${minLabel}`:formatFecha(p.fecha,p.hora);
+    const marcador=isFT||isActivo?`<span class="marcador ${cls}">${p.g1} - ${p.g2}</span>`:`<span class="marcador pre">vs</span>`;
 
     // Tarjetas y goles
     const goles = p.goles || [];
@@ -1162,6 +1164,25 @@ function renderPartidos() {
       </div>
     </div>`;
 
+    // Circulitos de tiros de penales (shootout)
+    const dotPen = ok => ok
+      ? '<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#1d9e75;margin:0 2px"></span>'
+      : '<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#e24b4a;margin:0 2px"></span>';
+    const pL = p.penalesLocal, pV = p.penalesVisita;
+    const shootoutHtml = (isPENS || (isFT && (pL?.length||pV?.length))) && (pL||pV) ? `
+      <div style="margin-top:8px;padding-top:7px;border-top:1px solid #1a2a70">
+        <div style="font-size:10px;color:#c9a227;font-weight:700;margin-bottom:5px;letter-spacing:.5px">🥅 TIROS DE PENALES</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <span style="font-size:11px;color:#dde4ff;min-width:60px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.local}</span>
+          <span>${(pL||[]).map(dotPen).join('')}</span>
+          <span style="font-size:14px;font-weight:700;color:#c9a227;min-width:16px;text-align:center">${(pL||[]).filter(x=>x).length}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:11px;color:#dde4ff;min-width:60px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.visitante}</span>
+          <span>${(pV||[]).map(dotPen).join('')}</span>
+          <span style="font-size:14px;font-weight:700;color:#c9a227;min-width:16px;text-align:center">${(pV||[]).filter(x=>x).length}</span>
+        </div>
+      </div>` : '';
     const reto=getRetoPartido(p.id);
     const retoHtml=reto?`<div style="font-size:10px;color:#8e44ad;margin-top:4px">🎲 ${reto.pregunta}</div>`:'';
     return `<div class="partido ${cls}">
@@ -1174,6 +1195,7 @@ function renderPartidos() {
         <span class="flag">${banderas(p.visitanteCod)}</span>
       </div>
       ${extraHtml}
+      ${shootoutHtml}
       ${retoHtml}
     </div>`;
   }
