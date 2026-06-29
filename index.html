@@ -356,7 +356,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v8.0</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v8.1</p>
 </header>
 
 <div class="topbar">
@@ -565,6 +565,7 @@ function entrar() {
   iniciarTimers();
   registrarPresencia();
   iniciarChatTimer();
+  iniciarPenalTimer();
   // Al entrar: forzar actualización de TODAS las APIs
   precargarTodo();
 }
@@ -2088,6 +2089,16 @@ function calcularRachas() {
   return { actual:cur, mejor:max };
 }
 
+async function refrescarPenalesFresh() {
+  // Trae los penales del KV en vivo (sin depender del db local) y actualiza db.penales.
+  // Lo llamamos antes de pintar el banner para garantizar que la "notificación" sea real-time.
+  try {
+    const fresh = await fetch('/api/db').then(r=>r.json());
+    const dirty = (window.dirtyHasta && dirtyHasta.penales && dirtyHasta.penales > Date.now());
+    if(!dirty) db.penales = fresh.penales || [];
+  } catch(e) {}
+}
+
 function renderPenalBanner() {
   const el = document.getElementById('penal-banner');
   if(!el) return;
@@ -2311,6 +2322,16 @@ async function borrarMensaje(id) {
   } catch(e) { toast('❌ Error al borrar'); }
 }
 
+let penalTimer = null;
+function iniciarPenalTimer(){
+  if(penalTimer) clearInterval(penalTimer);
+  penalTimer = setInterval(async () => {
+    await refrescarPenalesFresh();
+    renderPenalBanner();
+    if(document.getElementById('tab-juego')?.classList.contains('active')) renderJuego();
+  }, 8*1000); // cada 8 segundos: el banner es la "notificación", tiene que ser rápido
+}
+
 function iniciarChatTimer() {
   if(chatTimer) clearInterval(chatTimer);
   chatTimer = setInterval(async () => {
@@ -2481,6 +2502,7 @@ function renderAll(){
     iniciarTimers();
     registrarPresencia();
     iniciarChatTimer();
+  iniciarPenalTimer();
     // Al entrar: forzar actualización de TODAS las APIs
     precargarTodo();
   }
