@@ -374,7 +374,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v11.9</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v11.10</p>
 </header>
 
 <div class="topbar">
@@ -1871,7 +1871,7 @@ function setSyncStatus(estado){
   const hayLive=!!enCurso;
   const minLabel=enCurso&&enCurso.minuto?' '+enCurso.minuto:'';
   dot.className='sync-dot'+(hayLive?' live':'');dot.style.background='';
-  txt.textContent=enCurso?.status==='PENS'?'🥅 Penales'+minLabel:enCurso?.status==='ET'?'⚡ Tiempo extra'+minLabel:hayLive?'🔴 Partido en vivo'+minLabel:'Datos cargados';
+  txt.textContent=enCurso?.status==='PENS'?'🔴 En vivo · Penales':enCurso?.status==='ET'?'🔴 En vivo · Tiempo extra'+minLabel:hayLive?'🔴 Partido en vivo'+minLabel:'Datos cargados';
 }
 function toast(msg,dur=2500){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),dur);}
 function posChip(i){const cls=i===0?'p1':i===1?'p2':i===2?'p3':'pn';return`<span class="pos ${cls}">${i+1}</span>`;}
