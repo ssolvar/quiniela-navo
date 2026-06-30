@@ -374,7 +374,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v11.3</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v11.4</p>
 </header>
 
 <div class="topbar">
@@ -1187,12 +1187,12 @@ function renderPartidos() {
     const shootoutHtml = (isPENS || (isFT && maxKicks > 0)) && maxKicks > 0 ? `
       <div style="margin-top:8px;padding-top:7px;border-top:1px solid #1a2a70">
         <div style="font-size:10px;color:#c9a227;font-weight:700;margin-bottom:6px;letter-spacing:.5px">🥅 TIROS DE PENALES</div>
-        <div style="display:grid;grid-template-columns:52px repeat(${maxKicks},1fr) 20px;align-items:center;gap:2px;margin-bottom:4px">
+        <div style="display:grid;grid-template-columns:52px repeat(${maxKicks},40px) 20px;align-items:center;gap:2px;margin-bottom:4px;max-width:${52+maxKicks*42+24}px">
           <span style="font-size:10px;color:#dde4ff;text-align:right;padding-right:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.local}</span>
           ${padShootout(sL).map(dotCell).join('')}
           <span style="font-size:14px;font-weight:700;color:#c9a227;text-align:right">${sL.filter(x=>x?.gol).length}</span>
         </div>
-        <div style="display:grid;grid-template-columns:52px repeat(${maxKicks},1fr) 20px;align-items:center;gap:2px">
+        <div style="display:grid;grid-template-columns:52px repeat(${maxKicks},40px) 20px;align-items:center;gap:2px;max-width:${52+maxKicks*42+24}px">
           <span style="font-size:10px;color:#dde4ff;text-align:right;padding-right:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.visitante}</span>
           ${padShootout(sV).map(dotCell).join('')}
           <span style="font-size:14px;font-weight:700;color:#c9a227;text-align:right">${sV.filter(x=>x?.gol).length}</span>
