@@ -243,16 +243,22 @@ export default {
       }
       if (request.method === 'POST') {
         const body = await request.json();
-        let chat = await kvGet(KV, 'CHAT') || [];
         if (body.accion === 'agregar' && body.mensaje) {
+          // Jitter aleatorio para desincronizar escrituras concurrentes
+          await new Promise(r => setTimeout(r, Math.random() * 200));
+          let chat = await kvGet(KV, 'CHAT') || [];
           if (!chat.find(m => m.id === body.mensaje.id)) {
             chat = [...chat, body.mensaje].slice(-100);
             await kvSet(KV, 'CHAT', chat);
           }
+          return new Response(JSON.stringify({ chat }), { headers: CORS });
         } else if (body.accion === 'borrar' && body.id) {
+          let chat = await kvGet(KV, 'CHAT') || [];
           chat = chat.filter(m => m.id !== body.id);
           await kvSet(KV, 'CHAT', chat);
+          return new Response(JSON.stringify({ chat }), { headers: CORS });
         }
+        const chat = await kvGet(KV, 'CHAT') || [];
         return new Response(JSON.stringify({ chat }), { headers: CORS });
       }
     }
