@@ -374,7 +374,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v11.10</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v11.11</p>
 </header>
 
 <div class="topbar">
@@ -779,7 +779,8 @@ async function actualizarPartidosSiNecesario(forzar=false) {
   });
 
   let intervalo;
-  if(hayLive || hayPartidoArrancando) intervalo = 2*60*1000;  // en vivo o recién arrancado: cada 2 min
+  if(hayLive) intervalo = 60*1000;  // en vivo: cada 1 min
+  else if(hayPartidoArrancando) intervalo = 2*60*1000;  // recién arrancado: cada 2 min
   else if(hayPartidoProximo) intervalo = 5*60*1000;  // partido próximo: cada 5 min
   else if(hayPartidoReciente) intervalo = 5*60*1000; // partido recién terminado: cada 5 min
   else intervalo = 60*60*1000;                 // sin partido: cada 1 hora
@@ -816,7 +817,7 @@ function iniciarTimers() {
       return d>=0 && d < 3*60*60*1000;
     });
     const ultimoFetch = db.partidosFetchedAt ? new Date(db.partidosFetchedAt).getTime() : 0;
-    const intervalo = (hayLive || arrancando) ? 2*60*1000 : 60*60*1000;
+    const intervalo = hayLive ? 60*1000 : arrancando ? 2*60*1000 : 60*60*1000;
     if((ahora - ultimoFetch) >= intervalo) {
       await cargarDatos();
     } else {
