@@ -443,6 +443,29 @@ export default {
           });
         }
 
+          // 3ª pasada: predicciones para partidos PRE de los próximos 3 días sin odds aún
+          const ahora = Date.now();
+          const en3dias = ahora + 3 * 24 * 60 * 60 * 1000;
+          const preSinPred = partidosKV.filter(p =>
+            p.status === 'PRE' && p.espnId && p.prediccionLocal == null &&
+            new Date(p.fecha + 'T' + (p.hora||'00:00') + ':00Z').getTime() < en3dias
+          );
+          await Promise.all(preSinPred.map(async p => {
+            try {
+              const sr = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/summary?event=${p.espnId}`);
+              const sd = await sr.json();
+              const sdPred = extraerPredicciones(sd.pickcenter?.[0] || sd.odds?.[0]);
+              if(sdPred.prediccionLocal != null) {
+                const idx = partidosKV.findIndex(x => x.id === p.id);
+                if(idx >= 0) {
+                  partidosKV[idx].prediccionLocal  = sdPred.prediccionLocal;
+                  partidosKV[idx].prediccionVisita = sdPred.prediccionVisita;
+                  partidosKV[idx].prediccionEmpate = sdPred.prediccionEmpate;
+                }
+              }
+            } catch(e) {}
+          }));
+
         // Solo guardar si el KV tiene partidos (no sobreescribir con menos)
         if(partidosKV.length > 0) {
           const partidosFetchedAt = new Date().toISOString();
