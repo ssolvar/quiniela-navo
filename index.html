@@ -374,7 +374,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v11.6</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v11.7</p>
 </header>
 
 <div class="topbar">
@@ -959,7 +959,7 @@ async function responderReto(partidoId, opcion) {
   const reto = getRetoPartido(partidoId);
   if(!reto) return;
   const partido = db.partidos.find(p=>p.id===partidoId);
-  if(partido&&(partido.status==='LIVE'||partido.status==='HT'||partido.status==='FT')) {
+  if(partido&&partido.status!=='PRE') {
     toast('🔒 El partido ya inició'); return;
   }
   // Bloquear si ya respondió
@@ -977,7 +977,7 @@ async function responderReto(partidoId, opcion) {
 // =============================================
 function getPartidosConReto() {
   const _ahora = Date.now();
-  const vivos = db.partidos.filter(p=>(p.status==='LIVE'||p.status==='HT') && getRetoPartido(p.id));
+  const vivos = db.partidos.filter(p=>['LIVE','HT','ET','PENS'].includes(p.status) && getRetoPartido(p.id));
   const proximos = db.partidos.filter(p=>{
     if(p.status!=='PRE') return false;
     const reto = getRetoPartido(p.id);
@@ -1007,7 +1007,7 @@ function renderRetoPrincipal() {
   if(!reto) { c.innerHTML=''; return; }
 
   const isFT = partido.status==='FT';
-  const isLive = partido.status==='LIVE'||partido.status==='HT';
+  const isLive = ['LIVE','HT','ET','PENS'].includes(partido.status);
   const isPre = !isFT&&!isLive;
 
   const miRespuesta = currentUserId ? (reto.respuestas[currentUserId]||null) : null;
@@ -1027,8 +1027,9 @@ function renderRetoPrincipal() {
   }
 
   // Estado del partido
+  const vivoLabel = partido.status==='ET' ? '⚡ TIEMPO EXTRA' : partido.status==='PENS' ? '🥅 PENALES' : '🔴 EN VIVO';
   const matchLabel = isLive
-    ? `<span style="color:var(--do)">🔴 EN VIVO ${partido.minuto?partido.minuto+"'":''}${partido.g1!==null?' · '+partido.g1+'-'+partido.g2:''}</span>`
+    ? `<span style="color:var(--do)">${vivoLabel} ${partido.minuto?partido.minuto+"'":''}${partido.g1!==null?' · '+partido.g1+'-'+partido.g2:''}</span>`
     : isFT
     ? `✅ Finalizado · ${partido.g1} - ${partido.g2}`
     : `🕐 ${formatFecha(partido.fecha,partido.hora)}`;
