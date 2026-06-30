@@ -374,7 +374,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v11.2</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v11.3</p>
 </header>
 
 <div class="topbar">
@@ -1147,42 +1147,55 @@ function renderPartidos() {
     const statusLabel=isFT?'FINALIZADO':isHT?'⏸ MEDIO TIEMPO':isET?`⚡ TIEMPO EXTRA${minLabel}`:isPENS?`🥅 PENALES${minLabel}`:isLive?`EN VIVO${minLabel}`:formatFecha(p.fecha,p.hora);
     const marcador=isFT||isActivo?`<span class="marcador ${cls}">${p.g1} - ${p.g2}</span>`:`<span class="marcador pre">vs</span>`;
 
-    // Tarjetas y goles
+    // Tarjetas y goles — separados en tiempo normal y tiempo extra
     const goles = p.goles || [];
-    const golesL = goles.filter(g=>g.local).map(g=>`${g.jugador} ${g.minuto}`).join(', ');
-    const golesV = goles.filter(g=>!g.local).map(g=>`${g.minuto} ${g.jugador}`).join(', ');
+    const golesReg = goles.filter(g=>!g.et);
+    const golesET  = goles.filter(g=>g.et);
+    const fmtL = gs => gs.filter(g=>g.local).map(g=>`${g.jugador} ${g.minuto}`).join(', ');
+    const fmtV = gs => gs.filter(g=>!g.local).map(g=>`${g.minuto} ${g.jugador}`).join(', ');
     const amL=p.amarillasLocal||0, rjL=p.rojasLocal||0, amV=p.amarillasVisita||0, rjV=p.rojasVisita||0;
     const tarjL = (amL>0?`<span class="tcrd am"><span class="tn">${amL}</span>🟨</span>`:'')+(rjL>0?`<span class="tcrd rj"><span class="tn">${rjL}</span>🟥</span>`:'');
     const tarjV = (amV>0?`<span class="tcrd am">🟨<span class="tn">${amV}</span></span>`:'')+(rjV>0?`<span class="tcrd rj">🟥<span class="tn">${rjV}</span></span>`:'');
-    const hayExtra = tarjL||tarjV||golesL||golesV;
-    const extraHtml = !hayExtra ? '' : `<div class="pextra">
-      <div class="pextra-col">
-        ${tarjL}<span class="pgol">${golesL}</span>
-      </div>
-      <div class="pextra-col pextra-r">
-        ${tarjV}<span class="pgol">${golesV}</span>
-      </div>
+    const golesRegL=fmtL(golesReg), golesRegV=fmtV(golesReg);
+    const golesETL=fmtL(golesET), golesETV=fmtV(golesET);
+    const hayReg = tarjL||tarjV||golesRegL||golesRegV;
+    const hayET  = golesETL||golesETV;
+    const extraHtml = !hayReg ? '' : `<div class="pextra">
+      <div class="pextra-col">${tarjL}<span class="pgol">${golesRegL}</span></div>
+      <div class="pextra-col pextra-r"><span class="pgol">${golesRegV}</span>${tarjV}</div>
     </div>`;
+    const etHtml = !hayET ? '' : `
+      <div style="display:flex;align-items:center;gap:6px;margin:5px 0 2px;font-size:10px;color:#c9a227;font-weight:700;letter-spacing:.5px">
+        ⚡ TIEMPO EXTRA
+      </div>
+      <div class="pextra">
+        <div class="pextra-col"><span class="pgol">${golesETL}</span></div>
+        <div class="pextra-col pextra-r"><span class="pgol">${golesETV}</span></div>
+      </div>`;
 
-    // Circulitos de tiros de penales (shootout)
+    // Circulitos de tiros de penales (shootout) — grid alineado
     const sL = p.shootoutLocal || (p.penalesLocal||[]).map(g=>({jugador:'',gol:g}));
     const sV = p.shootoutVisita || (p.penalesVisita||[]).map(g=>({jugador:'',gol:g}));
-    const dotPen = (s) => `<span title="${s.jugador}" style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;margin:0 3px">
-      <span style="display:inline-block;width:13px;height:13px;border-radius:50%;background:${s.gol?'#1d9e75':'#e24b4a'}"></span>
-      ${s.jugador?`<span style="font-size:8px;color:${s.gol?'#1d9e75':'#e24b4a'};max-width:36px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.jugador.split(' ').pop()}</span>`:''}
-    </span>`;
-    const shootoutHtml = (isPENS || (isFT && (sL.length||sV.length))) && (sL.length||sV.length) ? `
+    const maxKicks = Math.max(sL.length, sV.length);
+    const padShootout = (arr) => [...arr, ...Array(maxKicks - arr.length).fill(null)];
+    const dotCell = (s) => s === null
+      ? `<div></div>`
+      : `<div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+           <div style="width:14px;height:14px;border-radius:50%;background:${s.gol?'#1d9e75':'#e24b4a'};flex-shrink:0"></div>
+           <span style="font-size:8px;color:${s.gol?'#1d9e75':'#e24b4a'};text-align:center;max-width:38px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.2">${(s.jugador||'').split(' ').pop()}</span>
+         </div>`;
+    const shootoutHtml = (isPENS || (isFT && maxKicks > 0)) && maxKicks > 0 ? `
       <div style="margin-top:8px;padding-top:7px;border-top:1px solid #1a2a70">
         <div style="font-size:10px;color:#c9a227;font-weight:700;margin-bottom:6px;letter-spacing:.5px">🥅 TIROS DE PENALES</div>
-        <div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:5px">
-          <span style="font-size:11px;color:#dde4ff;min-width:55px;text-align:right;padding-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.local}</span>
-          <span style="display:flex;flex-wrap:wrap">${sL.map(dotPen).join('')}</span>
-          <span style="font-size:15px;font-weight:700;color:#c9a227;min-width:14px;text-align:right">${sL.filter(x=>x.gol).length}</span>
+        <div style="display:grid;grid-template-columns:52px repeat(${maxKicks},1fr) 20px;align-items:center;gap:2px;margin-bottom:4px">
+          <span style="font-size:10px;color:#dde4ff;text-align:right;padding-right:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.local}</span>
+          ${padShootout(sL).map(dotCell).join('')}
+          <span style="font-size:14px;font-weight:700;color:#c9a227;text-align:right">${sL.filter(x=>x?.gol).length}</span>
         </div>
-        <div style="display:flex;align-items:flex-start;gap:6px">
-          <span style="font-size:11px;color:#dde4ff;min-width:55px;text-align:right;padding-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.visitante}</span>
-          <span style="display:flex;flex-wrap:wrap">${sV.map(dotPen).join('')}</span>
-          <span style="font-size:15px;font-weight:700;color:#c9a227;min-width:14px;text-align:right">${sV.filter(x=>x.gol).length}</span>
+        <div style="display:grid;grid-template-columns:52px repeat(${maxKicks},1fr) 20px;align-items:center;gap:2px">
+          <span style="font-size:10px;color:#dde4ff;text-align:right;padding-right:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.visitante}</span>
+          ${padShootout(sV).map(dotCell).join('')}
+          <span style="font-size:14px;font-weight:700;color:#c9a227;text-align:right">${sV.filter(x=>x?.gol).length}</span>
         </div>
       </div>` : '';
     const reto=getRetoPartido(p.id);
@@ -1197,6 +1210,7 @@ function renderPartidos() {
         <span class="flag">${banderas(p.visitanteCod)}</span>
       </div>
       ${extraHtml}
+      ${etHtml}
       ${shootoutHtml}
       ${retoHtml}
     </div>`;
