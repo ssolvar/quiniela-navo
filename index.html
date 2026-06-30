@@ -2841,8 +2841,8 @@ async function enviarMensaje() {
   };
 
   inp.value = '';
-  try {
-    // Usar endpoint dedicado solo para chat
+
+  const intentarEnviar = async () => {
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
@@ -2851,6 +2851,23 @@ async function enviarMensaje() {
     const data = await res.json();
     db.chat = data.chat || db.chat;
     renderChat();
+  };
+
+  try {
+    await intentarEnviar();
+    // Verificar después de 2.5s que el mensaje quedó guardado (protección ante race condition en KV)
+    setTimeout(async () => {
+      try {
+        const r = await fetch('/api/chat');
+        const d = await r.json();
+        if (!d.chat.find(m => m.id === msg.id)) {
+          await intentarEnviar(); // Reenvío silencioso
+        } else {
+          db.chat = d.chat;
+          renderChat();
+        }
+      } catch(e) {}
+    }, 2500);
   } catch(e) {
     console.error('Error enviando mensaje:', e);
     toast('❌ Error al enviar');
