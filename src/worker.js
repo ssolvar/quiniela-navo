@@ -95,6 +95,28 @@ const ESPN_ID_MAP = {
 // Limpia el nombre del goleador de los sufijos de ESPN ("X Goal", "X - Volley", "X Penalty - Scored", etc.)
 function limpiarJugador(txt){ return (txt||'').split(' - ')[0].replace(/\s+(Goal|Penalty|Header|Volley)$/i,'').trim(); }
 
+// Convierte cuota americana (moneyline) a probabilidad implícita
+function mlToProb(ml) {
+  if(ml == null || ml === 0) return null;
+  return ml < 0 ? (-ml) / (-ml + 100) : 100 / (ml + 100);
+}
+
+// Extrae y normaliza predicciones desde un objeto de odds de ESPN
+function extraerPredicciones(oddsObj) {
+  if(!oddsObj) return {};
+  const pL = mlToProb(oddsObj.homeTeamOdds?.moneyLine);
+  const pV = mlToProb(oddsObj.awayTeamOdds?.moneyLine);
+  const pE = mlToProb(oddsObj.drawOdds?.moneyLine);
+  if(pL == null || pV == null) return {};
+  const total = pL + pV + (pE ?? 0);
+  if(total <= 0) return {};
+  return {
+    prediccionLocal:  +(pL / total).toFixed(3),
+    prediccionVisita: +(pV / total).toFixed(3),
+    prediccionEmpate: pE != null ? +(pE / total).toFixed(3) : null,
+  };
+}
+
 // Mapa de IDs ESPN → IDs football-data.org
 
 
@@ -314,6 +336,7 @@ export default {
             const hora = dt.toISOString().slice(11,16);
             const espnId = ev.id;
             const mappedId = ESPN_ID_MAP[espnId] || espnId;
+            const pred = extraerPredicciones(comp.odds?.[0]);
             return {
               id: mappedId,
               espnId: ev.id,
@@ -333,6 +356,7 @@ export default {
               minuto: ['LIVE','HT','ET','PENS'].includes(status) ? comp.status?.displayClock : null,
               rojasLocal,
               rojasVisita,
+              ...pred,
             };
           }).filter(Boolean);
 
@@ -348,6 +372,12 @@ export default {
             partidosKV[idx].g1 = ep.g1;
             partidosKV[idx].g2 = ep.g2;
             partidosKV[idx].minuto = ep.minuto;
+            // Predicciones desde scoreboard odds (solo si ESPN las manda)
+            if(ep.prediccionLocal != null) {
+              partidosKV[idx].prediccionLocal  = ep.prediccionLocal;
+              partidosKV[idx].prediccionVisita = ep.prediccionVisita;
+              partidosKV[idx].prediccionEmpate = ep.prediccionEmpate;
+            }
             if(['LIVE','HT','ET','PENS','FT'].includes(ep.status)) {
               try {
                 const sr = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/summary?event=${ep.espnId}`);
@@ -372,6 +402,13 @@ export default {
                 partidosKV[idx].amarillasVisita = evts.filter(e=>e.shortText?.includes('Yellow Card')&&String(e.team?.id)===String(ep.awayId)).length;
                 partidosKV[idx].rojasLocal = evts.filter(e=>e.shortText?.includes('Red Card')&&String(e.team?.id)===String(ep.homeId)).length;
                 partidosKV[idx].rojasVisita = evts.filter(e=>e.shortText?.includes('Red Card')&&String(e.team?.id)===String(ep.awayId)).length;
+                // Predicciones desde pickcenter del summary (más confiable que el scoreboard)
+                const sdPred = extraerPredicciones(sd.pickcenter?.[0] || sd.odds?.[0]);
+                if(sdPred.prediccionLocal != null) {
+                  partidosKV[idx].prediccionLocal  = sdPred.prediccionLocal;
+                  partidosKV[idx].prediccionVisita = sdPred.prediccionVisita;
+                  partidosKV[idx].prediccionEmpate = sdPred.prediccionEmpate;
+                }
                 // Tiros de penales del shootout — ESPN los guarda en sd.shootout[]
                 if(sd.shootout && sd.shootout.length) {
                   const homeTeam = sd.shootout.find(t => String(t.id) === String(ep.homeId));
