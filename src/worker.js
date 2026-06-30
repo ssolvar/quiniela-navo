@@ -360,11 +360,10 @@ export default {
             };
           }).filter(Boolean);
 
-          // Merge: actualizar scores de hoy, NUNCA borrar partidos existentes
-          // Actualizar scores y fetch summary para goles/tarjetas
-          await Promise.all(espnPartidos.map(async ep => {
-            const idx = partidosKV.findIndex(p => p.id === ep.id);
-            if(idx < 0) return;
+          // Aplica scores/minuto/predicciones de ep al partido en partidosKV[idx], y si
+          // está LIVE/HT/ET/PENS/FT, también trae goles/tarjetas/shootout del summary.
+          // Compartida entre la 1ª pasada (match directo por id) y la 2ª (match por fecha+hora).
+          const enriquecerPartido = async (idx, ep) => {
             const eraFT = partidosKV[idx].status === 'FT';
             partidosKV[idx].status = ep.status;
             partidosKV[idx].espnId = ep.espnId; // necesario para el backfill de goles (/api/partidos/goles)
@@ -421,13 +420,22 @@ export default {
                 }
               } catch(e) {}
             }
+          };
+
+          // 1ª pasada: match directo por id (partidos de fase de grupos, ya mapeados)
+          await Promise.all(espnPartidos.map(async ep => {
+            const idx = partidosKV.findIndex(p => p.id === ep.id);
+            if(idx < 0) return;
+            await enriquecerPartido(idx, ep);
           }));
 
-          // 2ª pasada: rellenar EQUIPOS de cruces de eliminatoria desde ESPN (más rápido
-          // y completo que football-data), emparejando por fecha+hora (calendario oficial).
+          // 2ª pasada: cruces de eliminatoria que ESPN no tiene mapeados por id —
+          // se emparejan por fecha+hora (calendario oficial) y se enriquecen igual
+          // que en la 1ª pasada (antes solo copiaba status/g1/g2 y se perdía minuto,
+          // goles, shootout y predicciones para estos partidos).
           // Se ignoran los placeholders de ESPN tipo "Group L Winner" o "Third Place...".
           const esReal = n => n && n !== 'TBD' && !/winner|loser|place|group\s|round of|semifinal|\bfinal\b|quarter|cuartos|octavos|tercer|third|runner|\btba\b|\btbd\b/i.test(n);
-          espnPartidos.forEach(ep => {
+          await Promise.all(espnPartidos.map(async ep => {
             if(partidosKV.some(p => p.id === ep.id)) return; // ya emparejado por id (grupos)
             const idx = partidosKV.findIndex(p =>
               p.fase && p.fase !== 'Fase de Grupos' &&
@@ -439,8 +447,8 @@ export default {
             else if(!esReal(partidosKV[idx].local)) partidosKV[idx].local = 'TBD';
             if(esReal(ep.visitante)) { partidosKV[idx].visitante = ep.visitante; partidosKV[idx].visitanteCod = ep.visitanteCod; partidosKV[idx].awayId = ep.awayId; }
             else if(!esReal(partidosKV[idx].visitante)) partidosKV[idx].visitante = 'TBD';
-            if(ep.status !== 'PRE') { partidosKV[idx].status = ep.status; partidosKV[idx].g1 = ep.g1; partidosKV[idx].g2 = ep.g2; }
-          });
+            if(ep.status !== 'PRE') await enriquecerPartido(idx, ep);
+          }));
         }
 
           // 3ª pasada: predicciones para partidos PRE de los próximos 3 días sin odds aún
