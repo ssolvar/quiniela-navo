@@ -374,7 +374,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v11.7</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v11.9</p>
 </header>
 
 <div class="topbar">
@@ -756,8 +756,8 @@ async function precargarTodo() {
 async function actualizarPartidosSiNecesario(forzar=false) {
   const ahora = Date.now();
   const ultimoFetch = db.partidosFetchedAt ? new Date(db.partidosFetchedAt).getTime() : 0;
-  const hayLive = db.partidos.some(p=>p.status==='LIVE'||p.status==='HT');
-  
+  const hayLive = db.partidos.some(p=>['LIVE','HT','ET','PENS'].includes(p.status));
+
   // Verificar si hay partido programado en las próximas 3 horas o terminado hace menos de 1 hora
   const hayPartidoProximo = db.partidos.some(p => {
     if(p.status !== 'PRE') return false;
@@ -806,7 +806,7 @@ function iniciarTimers() {
 
   // Revisar cada 30s si necesita actualizar
   liveTimer = setInterval(async () => {
-    const hayLive = db.partidos.some(p=>p.status==='LIVE'||p.status==='HT');
+    const hayLive = db.partidos.some(p=>['LIVE','HT','ET','PENS'].includes(p.status));
     const ahora = Date.now();
     // Partido que ya arrancó por reloj pero sigue en PRE: hay que consultar ya
     const arrancando = db.partidos.some(p => {
@@ -1443,7 +1443,7 @@ function renderCobertura() {
   const ahora=Date.now();
   const visibles=db.partidos.filter(p=>{
     if(!esEquipoReal(p.local)||!esEquipoReal(p.visitante)) return false;
-    if(p.status==='PRE'||p.status==='LIVE'||p.status==='HT') return true; // próximos y en vivo siempre
+    if(['PRE','LIVE','HT','ET','PENS'].includes(p.status)) return true; // próximos y en vivo siempre
     if(p.status==='FT'){
       // mostrar hasta 1 hora después de terminar
       let fin=p.ftAt;
@@ -1457,7 +1457,7 @@ function renderCobertura() {
   });
   if(!visibles.length){c.innerHTML='<p style="font-size:13px;color:#888">No hay partidos próximos.</p>';return;}
   const headers=visibles.map(p=>{
-    const est=p.status==='FT'?'<br><span style="color:#c9a227;font-size:9px">FINAL</span>':(p.status==='LIVE'||p.status==='HT')?'<br><span style="color:var(--rj);font-size:9px">EN VIVO</span>':'';
+    const est=p.status==='FT'?'<br><span style="color:#c9a227;font-size:9px">FINAL</span>':['LIVE','HT','ET','PENS'].includes(p.status)?'<br><span style="color:var(--rj);font-size:9px">EN VIVO</span>':'';
     return `<th>${banderas(p.localCod)}<br>${p.local.split(' ')[0]}<br>vs<br>${banderas(p.visitanteCod)}<br>${p.visitante.split(' ')[0]}${est}</th>`;
   }).join('');
   const rows=db.participantes.map(part=>{
@@ -1867,9 +1867,11 @@ function setSyncStatus(estado){
   const dot=document.getElementById('sync-dot');const txt=document.getElementById('sync-text');if(!dot||!txt)return;
   if(estado==='loading'){dot.className='sync-dot';dot.style.background='#888';txt.textContent='Actualizando...';return;}
   if(estado==='error'){dot.className='sync-dot error';txt.textContent='Sin conexión';return;}
-  const hayLive=db.partidos.some(p=>p.status==='LIVE'||p.status==='HT');
+  const enCurso=db.partidos.find(p=>['LIVE','HT','ET','PENS'].includes(p.status));
+  const hayLive=!!enCurso;
+  const minLabel=enCurso&&enCurso.minuto?' '+enCurso.minuto:'';
   dot.className='sync-dot'+(hayLive?' live':'');dot.style.background='';
-  txt.textContent=hayLive?'🔴 Partido en vivo':'Datos cargados';
+  txt.textContent=enCurso?.status==='PENS'?'🥅 Penales'+minLabel:enCurso?.status==='ET'?'⚡ Tiempo extra'+minLabel:hayLive?'🔴 Partido en vivo'+minLabel:'Datos cargados';
 }
 function toast(msg,dur=2500){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),dur);}
 function posChip(i){const cls=i===0?'p1':i===1?'p2':i===2?'p3':'pn';return`<span class="pos ${cls}">${i+1}</span>`;}
