@@ -187,6 +187,7 @@ export default {
                   minuto: g.clock?.displayValue || '',
                   jugador: limpiarJugador(g.shortText),
                   local: String(g.team?.id) === String(p.homeId),
+                  et: (g.period?.number || 1) >= 3,
                 }));
               const golL = partidosKV[idx].goles.filter(g=>g.local).length;
               const golV = partidosKV[idx].goles.filter(g=>!g.local).length;
@@ -353,6 +354,7 @@ export default {
                 const sd = await sr.json();
                 const evts = sd.keyEvents || [];
                 // Goles de tiempo regular y tiempo extra (excluyendo tiros de penales del shootout)
+                // period: 1=1T, 2=2T, 3=ET1, 4=ET2, 5+=penales
                 partidosKV[idx].goles = evts
                   .filter(e => e.scoringPlay || (e.shortText && e.shortText.includes('Goal')))
                   .filter(e => !/shootout|penalty kick/i.test(e.type?.text||''))
@@ -360,6 +362,7 @@ export default {
                     minuto: g.clock?.displayValue || '',
                     jugador: limpiarJugador(g.shortText),
                     local: String(g.team?.id) === String(ep.homeId),
+                    et: (g.period?.number || 1) >= 3, // true si es gol de tiempo extra
                   }));
                 const golL = partidosKV[idx].goles.filter(g=>g.local).length;
                 const golV = partidosKV[idx].goles.filter(g=>!g.local).length;
