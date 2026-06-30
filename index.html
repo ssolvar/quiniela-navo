@@ -374,7 +374,7 @@ header p{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px}
 
 <header>
   <h1>⚽ QUINIELA LOS DEL NAVO</h1>
-  <p>MUNDIAL 2026 · USA · México · Canadá · v11.4</p>
+  <p>MUNDIAL 2026 · USA · México · Canadá · v11.5</p>
 </header>
 
 <div class="topbar">
@@ -1198,6 +1198,24 @@ function renderPartidos() {
           <span style="font-size:14px;font-weight:700;color:#c9a227;text-align:right">${sV.filter(x=>x?.gol).length}</span>
         </div>
       </div>` : '';
+    // Barra de predicción (solo si hay datos y el partido no terminó)
+    const pL=p.prediccionLocal, pV=p.prediccionVisita, pE=p.prediccionEmpate;
+    const predHtml = (pL != null && pV != null && !isFT) ? (() => {
+      const pLp=Math.round(pL*100), pVp=Math.round(pV*100), pEp=pE!=null?Math.round(pE*100):0;
+      return `<div style="margin-top:7px;padding-top:6px;border-top:1px solid #1a2a70">
+        <div style="font-size:9px;color:#6677aa;margin-bottom:4px;letter-spacing:.4px;text-transform:uppercase">📊 Probabilidades según ESPN</div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;padding:0 1px">
+          <span style="color:#4c8ef7;font-weight:700">${pLp}%</span>
+          ${pE!=null?`<span style="color:#8899cc">Empate ${pEp}%</span>`:''}
+          <span style="color:#e24b4a;font-weight:700">${pVp}%</span>
+        </div>
+        <div style="display:flex;border-radius:4px;overflow:hidden;height:6px;background:#0d1440">
+          <div style="width:${pLp}%;background:#4c8ef7;min-width:2px"></div>
+          ${pE!=null?`<div style="width:${pEp}%;background:#2a3060;min-width:2px"></div>`:''}
+          <div style="width:${pVp}%;background:#e24b4a;min-width:2px"></div>
+        </div>
+      </div>`;
+    })() : '';
     const reto=getRetoPartido(p.id);
     const retoHtml=reto?`<div style="font-size:10px;color:#8e44ad;margin-top:4px">🎲 ${reto.pregunta}</div>`:'';
     return `<div class="partido ${cls}">
@@ -1213,6 +1231,7 @@ function renderPartidos() {
       ${etHtml}
       ${shootoutHtml}
       ${retoHtml}
+      ${predHtml}
     </div>`;
   }
 
