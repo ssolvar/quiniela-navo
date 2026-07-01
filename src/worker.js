@@ -374,6 +374,9 @@ export default {
             partidosKV[idx].status = ep.status;
             partidosKV[idx].espnId = ep.espnId; // necesario para el backfill de goles (/api/partidos/goles)
             if(ep.status === 'FT' && !eraFT && !partidosKV[idx].ftAt) partidosKV[idx].ftAt = Date.now();
+            // Actualizar horario por si ESPN lo cambió (ej. partido postergado por lluvia)
+            if(ep.fecha) partidosKV[idx].fecha = ep.fecha;
+            if(ep.hora) partidosKV[idx].hora = ep.hora;
             partidosKV[idx].g1 = ep.g1;
             partidosKV[idx].g2 = ep.g2;
             partidosKV[idx].minuto = ep.minuto;
@@ -443,7 +446,11 @@ export default {
           const esReal = n => n && n !== 'TBD' && !/winner|loser|place|group\s|round of|semifinal|\bfinal\b|quarter|cuartos|octavos|tercer|third|runner|\btba\b|\btbd\b/i.test(n);
           await Promise.all(espnPartidos.map(async ep => {
             if(partidosKV.some(p => p.id === ep.id)) return; // ya emparejado por id (grupos)
-            const idx = partidosKV.findIndex(p =>
+            // Buscar por espnId primero (funciona aunque haya cambiado el horario)
+            let idx = partidosKV.findIndex(p =>
+              p.fase && p.fase !== 'Fase de Grupos' && p.espnId && String(p.espnId) === String(ep.espnId));
+            // Si no, intentar por fecha+hora (primera vez que se sincroniza el partido)
+            if(idx < 0) idx = partidosKV.findIndex(p =>
               p.fase && p.fase !== 'Fase de Grupos' &&
               p.fecha === ep.fecha && (p.hora||'').slice(0,2) === (ep.hora||'').slice(0,2));
             if(idx < 0) return;
